@@ -21,7 +21,7 @@ with a live contact list, proximity alerts, and a full track readout.
 ### With your RTL-SDR (Linux host, including a Raspberry Pi)
 
 ```bash
-git clone https://github.com/YOUR-USERNAME/skywatch.git
+git clone https://github.com/mutatedplague/skywatch.git
 cd skywatch
 cp .env.example .env
 # set HOME_LAT and HOME_LON to your rooftop position, then:
