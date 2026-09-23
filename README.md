@@ -11,7 +11,10 @@ with a live contact list, proximity alerts, and a full track readout.
 - **Or off a public feed.** adsb.lol, airplanes.live and OpenSky work with no
   hardware at all, and a built-in simulator runs the UI with no feed at all.
 - **Tells you what is overhead.** Anything inside your alert volume turns amber
-  on the scope, jumps to the top of the contact list, and can ring a tone.
+  on the scope, jumps to the top of the contact list, and can ring a tone. The
+  volume is a live control — widen it from the console and watch it resize.
+- **Two ways to look at it.** A phosphor radar scope, or a 3D hologram where
+  every contact floats at its real altitude over a terrain map. Six themes.
 - **One command to run.** `docker compose up` brings up the whole stack.
 
 ---
@@ -77,6 +80,55 @@ Docker Desktop cannot pass a USB device into a Linux container, so the bundled
 
 ---
 
+## The two views
+
+**VIEW** in the top rail switches between them; both share the range, terrain
+and theme controls, the contact list and the track readout.
+
+**SCOPE** is the classic plan view: a sweep, phosphor persistence and a
+top-down picture, densest and quickest to read.
+
+**HOLO** is a 3D projection of the same picture. Each contact sits at its real
+altitude above a dropped stalk to its ground position, so height is something
+you see rather than read. The amber drum is the alert volume itself — its
+radius is `ALERT_RADIUS_NM`, its lid is `ALERT_ALTITUDE_FT`, so "close and low"
+becomes a shape. Drag to orbit, scroll to zoom, click a contact to lock it. The
+camera drifts on its own and stops while you are moving it.
+
+Altitude is deliberately exaggerated against the ground scale — 45,000 ft is
+barely 7 nm, which would be flat against a 50 nm disc — so the altitude ruler
+is labelled with real flight levels.
+
+## Terrain
+
+**TERRAIN** underlays both views with Web Mercator map tiles centred on your
+site: shaded **relief**, **satellite** imagery, or dark **streets**. Relief and
+streets are recoloured into the active theme; satellite keeps its own colours.
+
+This is the one part of SKYWATCH that reaches the internet. Tiles come from a
+third party, which can infer roughly where your site is from the tiles it is
+asked for. **off** is always available and is the only setting that keeps the
+original no-third-party behaviour. Attribution for the active layer is shown in
+the corner of the scope, as those services require.
+
+## Themes
+
+Six palettes — `p7` (the original radar green), `tron`, `matrix`, `amber`,
+`alert` and `ice` — recolour the chrome, the scope canvas, the hologram and the
+terrain tint together, since all three read the same palette. Amber alerts and
+red emergency squawks keep their meaning in every theme.
+
+## Setting up from the console
+
+You do not have to edit `.env` to get running. **site** in the top rail opens a
+panel for the position, the site name, the alert volume and the receiver range,
+with **use this device** to take the position from the browser. The receiver
+validates and saves it, then pushes the change to every connected console, so
+the rings redraw as soon as you hit save.
+
+What the console saves wins over `.env`; **revert to .env** puts it back. Set
+`ALLOW_SITE_EDIT=false` to make the console read-only.
+
 ## Reading the scope
 
 | What you see | What it means |
@@ -117,6 +169,12 @@ Everything is set through environment variables, normally via `.env`. See
 | `FRONTEND_PORT` | `3000` | Console port. |
 | `BACKEND_PORT` | `4000` | Receiver API port. |
 | `NEXT_PUBLIC_API_URL` | *(none)* | Only needed behind a reverse proxy; otherwise the browser derives it. |
+| `ALLOW_SITE_EDIT` | `true` | Set `false` to stop the console changing the site. |
+| `STATE_DIR` | `state` | Where a console-saved position is persisted. |
+
+`HOME_LAT`, `HOME_LON`, `SITE_NAME`, `RANGE_NM`, `ALERT_RADIUS_NM` and
+`ALERT_ALTITUDE_FT` are starting values: anything saved from the console
+overrides them and survives a restart.
 
 Radio-side settings — `DUMP1090_GAIN`, `DUMP1090_DEVICE`,
 `DUMP1090_MAX_RANGE_NM`, `DUMP1090_VERSION`, `DUMP1090_EXTRA_ARGS` — are
@@ -181,7 +239,17 @@ The backend is useful on its own:
 | `GET /api/health` | Liveness, source name, contact count |
 | `GET /api/config` | Site position, range, alert volume |
 | `GET /api/aircraft` | The current picture, same shape as a socket frame |
+| `POST /api/site` | Move the site or resize the alert volume |
 | `WS /ws` | A snapshot per poll |
+
+`POST /api/site` takes any of `lat`+`lon`, `site`, `rangeNm`, `alertRadiusNm`,
+`alertAltitudeFt`, or `{"reset": true}` to fall back to `.env`. It validates
+against the receiver's own bounds and answers `400` with a reason:
+
+```bash
+curl -X POST localhost:4000/api/site -H 'content-type: application/json' \
+  -d '{"lat": 39.2242, "lon": -82.9893, "alertRadiusNm": 8}'
+```
 
 ```bash
 curl -s localhost:4000/api/aircraft | jq '.aircraft[0]'
@@ -216,8 +284,9 @@ Layout of the repository:
 ```
 backend/src/sources/   one adapter per feed, all returning the same shape
 backend/src/tracker.ts contact history, geometry and ageing
-frontend/components/   RadarScope is the canvas; everything else is chrome
-frontend/lib/          feed socket, formatters, icon mapping
+backend/src/site.ts    the console-saved position, persisted and validated
+frontend/components/   RadarScope is the 2D canvas, HoloScope the 3D view
+frontend/lib/          feed socket, formatters, icons, themes, terrain tiles
 dump1090/              builds flightaware/dump1090 and serves its JSON
 ```
 

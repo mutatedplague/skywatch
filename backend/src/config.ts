@@ -14,30 +14,29 @@ function envStr(name: string, fallback: string): string {
   return raw === undefined || raw.trim() === '' ? fallback : raw.trim();
 }
 
+function envBool(name: string, fallback: boolean): boolean {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  return !/^(0|false|no|off)$/i.test(raw.trim());
+}
+
+/** A coordinate from the environment, or null when unset or out of range. */
+function envCoord(name: string, limit: number): number | null {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || Math.abs(parsed) > limit) {
+    console.warn(`[config] ${name}="${raw}" is not a coordinate within ±${limit}, ignoring`);
+    return null;
+  }
+  return parsed;
+}
+
 export type SourceName = 'demo' | 'dump1090' | 'adsblol' | 'airplaneslive' | 'opensky';
 
 const SOURCES: SourceName[] = ['demo', 'dump1090', 'adsblol', 'airplaneslive', 'opensky'];
 
-/** Home position is required for real feeds; without it we fall back to the simulator. */
-const latRaw = process.env.HOME_LAT;
-const lonRaw = process.env.HOME_LON;
-const hasSite =
-  latRaw !== undefined &&
-  lonRaw !== undefined &&
-  Number.isFinite(Number(latRaw)) &&
-  Number.isFinite(Number(lonRaw));
-
-const requested = envStr('ADSB_SOURCE', 'adsblol').toLowerCase() as SourceName;
-const source: SourceName = SOURCES.includes(requested) ? requested : 'adsblol';
-
-if (!SOURCES.includes(requested)) {
-  console.warn(`[config] unknown ADSB_SOURCE="${requested}", falling back to adsblol`);
-}
-if (!hasSite && source !== 'demo') {
-  console.warn('[config] HOME_LAT/HOME_LON are not set — starting in simulation mode.');
-}
-
-const DEFAULT_POLL_MS: Record<SourceName, number> = {
+export const DEFAULT_POLL_MS: Record<SourceName, number> = {
   demo: 500,
   dump1090: 1000,
   // adsb.lol and airplanes.live both ask for no more than one request per second.
@@ -46,20 +45,58 @@ const DEFAULT_POLL_MS: Record<SourceName, number> = {
   opensky: 10000,
 };
 
-const effectiveSource: SourceName = hasSite ? source : 'demo';
+const requestedRaw = envStr('ADSB_SOURCE', 'adsblol').toLowerCase();
+const requestedSource: SourceName = SOURCES.includes(requestedRaw as SourceName)
+  ? (requestedRaw as SourceName)
+  : 'adsblol';
 
-export const config = {
+if (!SOURCES.includes(requestedRaw as SourceName)) {
+  console.warn(`[config] unknown ADSB_SOURCE="${requestedRaw}", falling back to adsblol`);
+}
+
+/**
+ * What the poller, tracker and source adapters read. The site position is not
+ * fixed at boot — the console can move it — so this is an interface and
+ * `runtime` serves live values through it.
+ */
+export interface Config {
+  port: number;
+  host: string;
+  site: string;
+  lat: number;
+  lon: number;
+  rangeNm: number;
+  source: SourceName;
+  simulated: boolean;
+  pollMs: number;
+  alertRadiusNm: number;
+  alertAltitudeFt: number;
+  staleSeconds: number;
+  dump1090Url: string;
+  openskyClientId: string;
+  openskyClientSecret: string;
+  corsOrigin: string;
+}
+
+/**
+ * Settings straight from the environment. `lat`/`lon`/`site` are only the
+ * starting point: a position saved from the console takes precedence, so read
+ * the live values from `runtime` rather than here.
+ */
+export const env = {
   port: envNum('PORT', 4000),
   host: envStr('HOST', '0.0.0.0'),
   site: envStr('SITE_NAME', 'HOME'),
-  /** Falls back to a spot over open water so a misconfigured deploy is obvious. */
-  lat: hasSite ? Number(latRaw) : 0,
-  lon: hasSite ? Number(lonRaw) : 0,
+  lat: envCoord('HOME_LAT', 90),
+  lon: envCoord('HOME_LON', 180),
+  requestedSource,
   /** Radius the backend pulls traffic for. The UI zooms within this. */
   rangeNm: Math.min(250, Math.max(5, envNum('RANGE_NM', 100))),
-  source: effectiveSource,
-  simulated: effectiveSource === 'demo',
-  pollMs: Math.max(250, envNum('POLL_MS', DEFAULT_POLL_MS[effectiveSource])),
+  /** Set only when POLL_MS is given; otherwise the per-source default applies. */
+  pollMsOverride:
+    process.env.POLL_MS === undefined || process.env.POLL_MS.trim() === ''
+      ? null
+      : Math.max(250, envNum('POLL_MS', 1000)),
   /** A contact closer than this and lower than ALERT_ALTITUDE_FT is "overhead". */
   alertRadiusNm: envNum('ALERT_RADIUS_NM', 3),
   alertAltitudeFt: envNum('ALERT_ALTITUDE_FT', 12000),
@@ -69,6 +106,8 @@ export const config = {
   openskyClientId: envStr('OPENSKY_CLIENT_ID', ''),
   openskyClientSecret: envStr('OPENSKY_CLIENT_SECRET', ''),
   corsOrigin: envStr('CORS_ORIGIN', '*'),
+  /** Set ALLOW_SITE_EDIT=false to stop the console moving the site. */
+  allowSiteEdit: envBool('ALLOW_SITE_EDIT', true),
+  /** Where a console-saved position is persisted. */
+  stateDir: envStr('STATE_DIR', 'state'),
 } as const;
-
-export type Config = typeof config;

@@ -19,6 +19,9 @@ ENV NODE_ENV=production
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
+# Owned by node so a mounted volume inherits a writable directory.
+RUN mkdir -p /app/state && chown node:node /app/state
+ENV STATE_DIR=/app/state
 USER node
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

@@ -1,19 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { resolveHttpBase } from './api';
 import type { LinkState, Snapshot } from './types';
-
-/**
- * The browser may be on a different host than the one that built the image,
- * so the API base is resolved at runtime from the page URL unless overridden.
- */
-function resolveHttpBase(): string {
-  const override = process.env.NEXT_PUBLIC_API_URL;
-  if (override) return override.replace(/\/+$/, '');
-  if (typeof window === 'undefined') return 'http://localhost:4000';
-  const port = process.env.NEXT_PUBLIC_API_PORT ?? '4000';
-  return `${window.location.protocol}//${window.location.hostname}:${port}`;
-}
 
 function toWsUrl(httpBase: string): string {
   return `${httpBase.replace(/^http/, 'ws')}/ws`;

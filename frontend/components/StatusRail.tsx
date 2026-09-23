@@ -3,6 +3,14 @@
 import { useEffect, useState } from 'react';
 import { formatClock, formatDistance } from '@/lib/format';
 import type { FeedStats, LinkState, SiteConfig } from '@/lib/types';
+import SegmentedControl from './SegmentedControl';
+
+export type ScopeView = 'scope' | 'holo';
+
+const VIEW_OPTIONS: Array<{ value: ScopeView; label: string }> = [
+  { value: 'scope', label: 'scope' },
+  { value: 'holo', label: 'holo' },
+];
 
 interface StatusRailProps {
   config: SiteConfig | null;
@@ -12,6 +20,9 @@ interface StatusRailProps {
   link: LinkState;
   audio: boolean;
   onToggleAudio: () => void;
+  view: ScopeView;
+  onView: (view: ScopeView) => void;
+  onOpenSettings: () => void;
 }
 
 const LINK_COPY: Record<LinkState, string> = {
@@ -27,6 +38,9 @@ export default function StatusRail({
   link,
   audio,
   onToggleAudio,
+  view,
+  onView,
+  onOpenSettings,
 }: StatusRailProps) {
   const [clock, setClock] = useState<string>('----:--Z');
 
@@ -41,9 +55,9 @@ export default function StatusRail({
   const dot = healthy ? 'bg-phosphor' : link === 'connecting' ? 'bg-sodium' : 'bg-emergency';
 
   return (
-    <header className="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 border-b border-hairline bg-console px-4 py-2.5">
+    <header className="hud-scan hud-enter relative flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 border-b border-hairline bg-console px-4 py-2.5">
       <div className="flex items-baseline gap-3">
-        <span className="font-display text-[1.05rem] font-bold tracking-[0.34em] text-phosphor">
+        <span className="hud-glow hud-flicker font-display text-[1.05rem] font-bold tracking-[0.34em] text-phosphor">
           SKYWATCH
         </span>
         <span className="text-[0.68rem] text-ink-dim">
@@ -69,9 +83,26 @@ export default function StatusRail({
 
       <div className="ml-auto flex items-center gap-4">
         {config?.simulated ? (
-          <span className="chamfer-sm border border-sodium/50 bg-sodium/10 px-2 py-1 text-[0.62rem] tracking-[0.22em] text-sodium">
-            SIMULATED TRAFFIC
-          </span>
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="chamfer-sm border border-sodium/50 bg-sodium/10 px-2 py-1 text-[0.62rem] tracking-[0.22em] text-sodium transition-colors hover:bg-sodium/20"
+            title="No site position is set, so the receiver is simulating traffic. Set one."
+          >
+            SIMULATED — SET POSITION
+          </button>
+        ) : null}
+
+        <SegmentedControl label="VIEW" options={VIEW_OPTIONS} value={view} onChange={onView} />
+
+        {config?.siteEditable !== false ? (
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="chamfer-sm border border-hairline px-2.5 py-1 text-[0.66rem] tracking-[0.18em] text-ink-dim transition-colors hover:border-hairline-lit hover:text-ink"
+          >
+            site
+          </button>
         ) : null}
 
         <button
@@ -83,7 +114,7 @@ export default function StatusRail({
           {audio ? 'tone on' : 'tone off'}
         </button>
 
-        <span className="font-display text-[0.95rem] tracking-[0.12em] text-phosphor tabular-nums">
+        <span className="hud-glow font-display text-[0.95rem] tracking-[0.12em] text-phosphor tabular-nums">
           {clock}
         </span>
       </div>

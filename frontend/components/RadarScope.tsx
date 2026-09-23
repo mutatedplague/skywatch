@@ -4,17 +4,26 @@ import { useCallback, useEffect, useRef } from 'react';
 import { iconForAircraft, sizeForIcon } from '@/lib/aircraftIcons';
 import { displayName, formatAltitudeBlock } from '@/lib/format';
 import { getAircraftSprite, preloadCommonIcons } from '@/lib/iconSprites';
+import { TERRAIN_NONE, TerrainRaster } from '@/lib/terrain';
+import { activeThemeId, palette, type RGB } from '@/lib/themes';
 import type { Aircraft, SiteConfig } from '@/lib/types';
 
 const SWEEP_PERIOD_MS = 4000;
 const SWEEP_SPREAD_DEG = 78;
 
-const PHOSPHOR: RGB = [159, 194, 60];
-const STRIKE: RGB = [214, 236, 255];
-const SODIUM: RGB = [255, 179, 64];
-const EMERGENCY: RGB = [255, 74, 51];
+// Read per frame from the active theme, so switching theme repaints the scope.
+let PHOSPHOR: RGB = palette().phosphor;
+let STRIKE: RGB = palette().strike;
+let SODIUM: RGB = palette().sodium;
+let EMERGENCY: RGB = palette().emergency;
 
-type RGB = [number, number, number];
+function syncPalette() {
+  const p = palette();
+  PHOSPHOR = p.phosphor;
+  STRIKE = p.strike;
+  SODIUM = p.sodium;
+  EMERGENCY = p.emergency;
+}
 
 const rgba = (c: RGB, a: number) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
 
@@ -50,6 +59,8 @@ export interface RadarScopeProps {
   rangeNm: number;
   selectedHex: string | null;
   symbology: Symbology;
+  /** Terrain layer id, or TERRAIN_NONE. */
+  terrain: string;
   onSelect: (hex: string | null) => void;
 }
 
@@ -59,14 +70,15 @@ export default function RadarScope({
   rangeNm,
   selectedHex,
   symbology,
+  terrain,
   onSelect,
 }: RadarScopeProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   // Live props for the animation loop, so it never has to be torn down.
-  const stateRef = useRef({ aircraft, config, rangeNm, selectedHex, symbology });
-  stateRef.current = { aircraft, config, rangeNm, selectedHex, symbology };
+  const stateRef = useRef({ aircraft, config, rangeNm, selectedHex, symbology, terrain });
+  stateRef.current = { aircraft, config, rangeNm, selectedHex, symbology, terrain };
 
   const hitsRef = useRef<Hit[]>([]);
   const hoverRef = useRef<string | null>(null);
@@ -113,6 +125,7 @@ export default function RadarScope({
 
     resize();
     preloadCommonIcons();
+    const raster = new TerrainRaster(1024);
     const observer = new ResizeObserver(resize);
     observer.observe(wrap);
 
@@ -127,6 +140,7 @@ export default function RadarScope({
         rangeNm: range,
         selectedHex: selected,
         symbology: symbols,
+        terrain: terrainId,
       } = stateRef.current;
 
       const cx = width / 2;
@@ -138,10 +152,12 @@ export default function RadarScope({
       ctx.clearRect(0, 0, width, height);
 
       // --- scope face ----------------------------------------------------
+      syncPalette();
+      const faceStops = palette().face;
       const face = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
-      face.addColorStop(0, '#0a1c16');
-      face.addColorStop(0.7, '#071310');
-      face.addColorStop(1, '#040c0a');
+      face.addColorStop(0, rgba(faceStops[0], 1));
+      face.addColorStop(0.7, rgba(faceStops[1], 1));
+      face.addColorStop(1, rgba(faceStops[2], 1));
       ctx.fillStyle = face;
       ctx.beginPath();
       ctx.arc(cx, cy, R, 0, Math.PI * 2);
@@ -151,6 +167,19 @@ export default function RadarScope({
       ctx.beginPath();
       ctx.arc(cx, cy, R, 0, Math.PI * 2);
       ctx.clip();
+
+      // --- terrain underlay ----------------------------------------------
+      // The raster covers 2 × range on a side, so it lands exactly on the
+      // scope circle's bounding box and the clip above trims it to the face.
+      if (site && terrainId !== TERRAIN_NONE) {
+        raster.configure(site.lat, site.lon, range * 2, terrainId, activeThemeId());
+        if (raster.ready) {
+          ctx.save();
+          ctx.globalAlpha = 0.42;
+          ctx.drawImage(raster.canvas, cx - R, cy - R, R * 2, R * 2);
+          ctx.restore();
+        }
+      }
 
       drawGrid(ctx, cx, cy, R);
       if (site) drawAlertRing(ctx, cx, cy, site.alertRadiusNm * pxPerNm, now);

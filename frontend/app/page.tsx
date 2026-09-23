@@ -2,17 +2,23 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import BootSequence from '@/components/BootSequence';
+import HoloScope from '@/components/HoloScope';
 import RadarScope, { type Symbology } from '@/components/RadarScope';
 import Readout from '@/components/Readout';
 import { ScopeControls, ScopeLegend, SiteBlock } from '@/components/ScopeHud';
-import StatusRail from '@/components/StatusRail';
+import SettingsPanel from '@/components/SettingsPanel';
+import StatusRail, { type ScopeView } from '@/components/StatusRail';
 import StripBay from '@/components/StripBay';
+import { applyTheme, DEFAULT_THEME } from '@/lib/themes';
 import { useContactTone } from '@/lib/useContactTone';
 import { useRadarFeed } from '@/lib/useRadarFeed';
 
 const RANGE_STEPS = [5, 10, 25, 50, 100, 150, 250];
 const RANGE_KEY = 'skywatch.range';
 const SYMBOLOGY_KEY = 'skywatch.symbology';
+const VIEW_KEY = 'skywatch.view';
+const TERRAIN_KEY = 'skywatch.terrain';
+const THEME_KEY = 'skywatch.theme';
 
 export default function Console() {
   const { snapshot, link, error } = useRadarFeed();
@@ -21,6 +27,10 @@ export default function Console() {
   const [symbology, setSymbology] = useState<Symbology>('icons');
   const [audio, setAudio] = useState(false);
   const [booting, setBooting] = useState(true);
+  const [view, setView] = useState<ScopeView>('scope');
+  const [terrain, setTerrain] = useState<string>('relief');
+  const [theme, setTheme] = useState<string>(DEFAULT_THEME);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const config = snapshot?.config ?? null;
   const aircraft = useMemo(() => snapshot?.aircraft ?? [], [snapshot]);
@@ -32,6 +42,12 @@ export default function Console() {
     if (Number.isFinite(storedRange) && storedRange > 0) setRangeNm(storedRange);
     const storedSymbology = window.localStorage.getItem(SYMBOLOGY_KEY);
     if (storedSymbology === 'icons' || storedSymbology === 'blips') setSymbology(storedSymbology);
+    const storedView = window.localStorage.getItem(VIEW_KEY);
+    if (storedView === 'scope' || storedView === 'holo') setView(storedView);
+    const storedTerrain = window.localStorage.getItem(TERRAIN_KEY);
+    if (storedTerrain) setTerrain(storedTerrain);
+    const storedTheme = window.localStorage.getItem(THEME_KEY);
+    if (storedTheme) setTheme(storedTheme);
   }, []);
 
   useEffect(() => {
@@ -42,6 +58,20 @@ export default function Console() {
     window.localStorage.setItem(SYMBOLOGY_KEY, symbology);
   }, [symbology]);
 
+  useEffect(() => {
+    window.localStorage.setItem(VIEW_KEY, view);
+  }, [view]);
+
+  useEffect(() => {
+    window.localStorage.setItem(TERRAIN_KEY, terrain);
+  }, [terrain]);
+
+  // Repaints the CSS custom properties and the palette the canvas layers read.
+  useEffect(() => {
+    applyTheme(theme);
+    window.localStorage.setItem(THEME_KEY, theme);
+  }, [theme]);
+
   // Never let the scope zoom past what the receiver is actually pulling.
   useEffect(() => {
     if (config && rangeNm > config.rangeNm) setRangeNm(config.rangeNm);
@@ -49,11 +79,12 @@ export default function Console() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setSelectedHex(null);
+      // The settings panel swallows Escape for itself.
+      if (event.key === 'Escape' && !settingsOpen) setSelectedHex(null);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [settingsOpen]);
 
   const rangeOptions = useMemo(() => {
     const cap = config?.rangeNm ?? 100;
@@ -83,6 +114,10 @@ export default function Console() {
     <>
       {booting ? <BootSequence config={config} onComplete={() => setBooting(false)} /> : null}
 
+      {settingsOpen && config ? (
+        <SettingsPanel config={config} onClose={() => setSettingsOpen(false)} />
+      ) : null}
+
       <main className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
         <StatusRail
           config={config}
@@ -91,19 +126,35 @@ export default function Console() {
           link={link}
           audio={audio}
           onToggleAudio={() => setAudio((on) => !on)}
+          view={view}
+          onView={setView}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <section className="flex min-h-0 flex-1 flex-col">
             <div className="relative min-h-0 flex-1 p-3 max-lg:aspect-square">
-              <RadarScope
-                aircraft={visible}
-                config={config}
-                rangeNm={rangeNm}
-                selectedHex={selectedHex}
-                symbology={symbology}
-                onSelect={setSelectedHex}
-              />
+              {view === 'holo' ? (
+                <HoloScope
+                  aircraft={visible}
+                  config={config}
+                  rangeNm={rangeNm}
+                  selectedHex={selectedHex}
+                  terrain={terrain}
+                  theme={theme}
+                  onSelect={setSelectedHex}
+                />
+              ) : (
+                <RadarScope
+                  aircraft={visible}
+                  config={config}
+                  rangeNm={rangeNm}
+                  selectedHex={selectedHex}
+                  symbology={symbology}
+                  terrain={terrain}
+                  onSelect={setSelectedHex}
+                />
+              )}
 
               {/* On wide screens the console furniture fills the corners the
                   circular scope cannot reach. */}
@@ -115,9 +166,18 @@ export default function Console() {
                   onRange={setRangeNm}
                   symbology={symbology}
                   onSymbology={setSymbology}
+                  showSymbology={view === 'scope'}
+                  terrain={terrain}
+                  onTerrain={setTerrain}
+                  theme={theme}
+                  onTheme={setTheme}
                 />
-                <SiteBlock config={config} className="absolute bottom-6 left-6 max-w-[15rem]" />
-                <ScopeLegend className="absolute bottom-6 right-6 text-right" />
+                <SiteBlock
+                  config={config}
+                  onEdit={() => setSettingsOpen(true)}
+                  className="absolute bottom-6 left-6 max-w-[15rem]"
+                />
+                <ScopeLegend terrain={terrain} className="absolute bottom-6 right-6 text-right" />
               </div>
 
               {link !== 'live' && !snapshot ? (
@@ -134,8 +194,13 @@ export default function Console() {
                 onRange={setRangeNm}
                 symbology={symbology}
                 onSymbology={setSymbology}
+                showSymbology={view === 'scope'}
+                terrain={terrain}
+                onTerrain={setTerrain}
+                theme={theme}
+                onTheme={setTheme}
               />
-              <ScopeLegend />
+              <ScopeLegend terrain={terrain} />
             </div>
           </section>
 

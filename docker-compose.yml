@@ -49,6 +49,12 @@ services:
       OPENSKY_CLIENT_SECRET: ${OPENSKY_CLIENT_SECRET:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       PORT: "4000"
+      # Set false to stop the console moving the site from the browser.
+      ALLOW_SITE_EDIT: ${ALLOW_SITE_EDIT:-true}
+      STATE_DIR: /app/state
+    volumes:
+      # Keeps a position saved from the console across a container rebuild.
+      - backend-state:/app/state
     ports:
       - "${BACKEND_PORT:-4000}:4000"
     # Lets ADSB_SOURCE=dump1090 reach a decoder running on the host itself.
@@ -67,3 +73,6 @@ services:
       - backend
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
+
+volumes:
+  backend-state:

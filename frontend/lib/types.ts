@@ -56,6 +56,10 @@ export interface SiteConfig {
   alertRadiusNm: number;
   alertAltitudeFt: number;
   pollMs: number;
+  /** Where the position in force came from: .env, the console, or nowhere yet. */
+  positionSource: 'env' | 'console' | 'none';
+  /** False when ALLOW_SITE_EDIT=false; the console hides its site control. */
+  siteEditable: boolean;
 }
 
 export interface Snapshot {

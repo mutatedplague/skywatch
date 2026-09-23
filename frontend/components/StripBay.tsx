@@ -16,13 +16,13 @@ export default function StripBay({ aircraft, config, selectedHex, onSelect }: St
 
   return (
     <section className="flex h-full min-h-0 flex-col border-l border-hairline bg-void">
-      <div className="flex shrink-0 items-baseline justify-between border-b border-hairline px-3 py-2">
-        <h2 className="font-display text-[0.8rem] tracking-[0.22em] text-ink">CONTACTS</h2>
+      <div className="hud-rail relative flex shrink-0 items-baseline justify-between border-b border-hairline px-3 py-2">
+        <h2 className="hud-glow font-display text-[0.8rem] tracking-[0.22em] text-ink">CONTACTS</h2>
         <span className="text-[0.66rem] text-ink-dim">nearest first</span>
       </div>
 
       {overhead.length > 0 ? (
-        <div className="shrink-0 border-b border-sodium/40 bg-sodium/[0.07] px-3 py-2">
+        <div className="hud-enter shrink-0 border-b border-sodium/40 bg-sodium/[0.07] px-3 py-2">
           <div className="flex items-center gap-2">
             <span className="alert-pulse inline-block h-1.5 w-1.5 bg-sodium" />
             <span className="font-display text-[0.78rem] tracking-[0.2em] text-sodium">

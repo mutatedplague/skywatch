@@ -21,7 +21,7 @@ interface ReadoutProps {
 export default function Readout({ aircraft, stats, now }: ReadoutProps) {
   if (!aircraft) {
     return (
-      <footer className="flex shrink-0 items-center gap-4 border-t border-hairline bg-console px-4 py-2.5 text-[0.72rem]">
+      <footer className="hud-scan relative flex shrink-0 items-center gap-4 border-t border-hairline bg-console px-4 py-2.5 text-[0.72rem]">
         <span className="text-ink-dim">
           Select a contact on the scope or in the list to read its full track.
         </span>
@@ -35,7 +35,7 @@ export default function Readout({ aircraft, stats, now }: ReadoutProps) {
   const squawkAlert = aircraft.emergency;
 
   return (
-    <footer className="shrink-0 border-t border-hairline bg-console px-4 py-2.5">
+    <footer className="hud-scan hud-enter relative shrink-0 border-t border-hairline bg-console px-4 py-2.5">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
         <div className="flex items-baseline gap-2.5">
           <span className="font-display text-[1.1rem] font-semibold tracking-[0.08em] text-strike">

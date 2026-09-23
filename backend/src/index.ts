@@ -2,26 +2,37 @@ import cors from '@fastify/cors';
 import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
 
-import { config } from './config.js';
-import { createSource } from './sources/index.js';
+import { env } from './config.js';
+import { runtime } from './runtime.js';
+import { currentSite, onSiteChange, resetSite, SiteError, updateSite } from './site.js';
+import { type AdsbSource, createSource } from './sources/index.js';
 import { Tracker } from './tracker.js';
 import type { Aircraft, FeedStats, SiteConfig, Snapshot } from './types.js';
 
-const source = createSource(config);
-const tracker = new Tracker(config);
+// Both are rebuilt when the site moves: the community adapters bake the
+// position into their request URL, and every track's geometry is measured from
+// the old origin.
+let source: AdsbSource = createSource(runtime);
+let tracker = new Tracker(runtime);
 
-const siteConfig: SiteConfig = {
-  site: config.site,
-  lat: config.lat,
-  lon: config.lon,
-  rangeNm: config.rangeNm,
-  source: config.source,
-  sourceLabel: source.label,
-  simulated: config.simulated,
-  alertRadiusNm: config.alertRadiusNm,
-  alertAltitudeFt: config.alertAltitudeFt,
-  pollMs: config.pollMs,
-};
+function describeSite(): SiteConfig {
+  return {
+    site: runtime.site,
+    lat: runtime.lat,
+    lon: runtime.lon,
+    rangeNm: runtime.rangeNm,
+    source: runtime.source,
+    sourceLabel: source.label,
+    simulated: runtime.simulated,
+    alertRadiusNm: runtime.alertRadiusNm,
+    alertAltitudeFt: runtime.alertAltitudeFt,
+    pollMs: runtime.pollMs,
+    positionSource: currentSite().positionSource,
+    siteEditable: env.allowSiteEdit,
+  };
+}
+
+let siteConfig: SiteConfig = describeSite();
 
 let stats: FeedStats = {
   tracked: 0,
@@ -46,14 +57,14 @@ const app = Fastify({
   },
 });
 
-await app.register(cors, { origin: config.corsOrigin === '*' ? true : config.corsOrigin.split(',') });
+await app.register(cors, { origin: runtime.corsOrigin === '*' ? true : runtime.corsOrigin.split(',') });
 await app.register(websocket);
 
 const clients = new Set<import('ws').WebSocket>();
 
 app.get('/api/health', async () => ({
   ok: true,
-  source: config.source,
+  source: runtime.source,
   sourceOk: stats.sourceOk,
   tracked: stats.tracked,
   lastUpdate: stats.lastUpdate,
@@ -61,6 +72,25 @@ app.get('/api/health', async () => ({
 }));
 
 app.get('/api/config', async () => siteConfig);
+
+/**
+ * Move the site from the console. The reply is the new config, and every
+ * connected scope is pushed a fresh frame immediately rather than waiting for
+ * the next poll, so the rings redraw as soon as the form is saved.
+ */
+app.post('/api/site', async (request, reply) => {
+  if (!env.allowSiteEdit) {
+    return reply.code(403).send({ error: 'site editing is disabled (ALLOW_SITE_EDIT=false)' });
+  }
+  const body = (request.body ?? {}) as Record<string, unknown>;
+  try {
+    const site = body.reset === true ? resetSite() : updateSite(body);
+    return { ok: true, config: siteConfig, site };
+  } catch (error) {
+    if (error instanceof SiteError) return reply.code(400).send({ error: error.message });
+    throw error;
+  }
+});
 
 app.get('/api/aircraft', async () => buildSnapshot());
 
@@ -97,6 +127,30 @@ function broadcast() {
     }
   }
 }
+
+/**
+ * The site moved. Every existing track's range and bearing were measured from
+ * the old origin, and the community adapters hold a URL built around it, so
+ * both are discarded rather than left to drift. The next poll refills the
+ * picture within pollMs.
+ */
+onSiteChange((site) => {
+  source = createSource(runtime);
+  tracker = new Tracker(runtime);
+  latest = [];
+  siteConfig = describeSite();
+  stats = { ...stats, tracked: 0, overhead: 0, closestNm: null, sourceOk: false, error: null };
+  app.log.info(
+    {
+      site: site.site,
+      position: site.lat === null ? 'unset' : `${site.lat.toFixed(4)}, ${site.lon?.toFixed(4)}`,
+      positionSource: site.positionSource,
+      source: runtime.source,
+    },
+    'site updated',
+  );
+  broadcast();
+});
 
 let consecutiveFailures = 0;
 let pollTimer: NodeJS.Timeout | undefined;
@@ -137,8 +191,8 @@ async function poll() {
   // Exponential backoff on failure, capped at 30s, so a dead feed stays cheap.
   const delay =
     consecutiveFailures === 0
-      ? config.pollMs
-      : Math.min(30_000, config.pollMs * 2 ** Math.min(6, consecutiveFailures));
+      ? runtime.pollMs
+      : Math.min(30_000, runtime.pollMs * 2 ** Math.min(6, consecutiveFailures));
   pollTimer = setTimeout(poll, delay);
 }
 
@@ -155,15 +209,16 @@ async function shutdown(signal: string) {
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 
-await app.listen({ port: config.port, host: config.host });
+await app.listen({ port: runtime.port, host: runtime.host });
 
 app.log.info(
   {
-    source: config.source,
+    source: runtime.source,
     label: source.label,
-    site: `${config.lat.toFixed(4)}, ${config.lon.toFixed(4)}`,
-    rangeNm: config.rangeNm,
-    pollMs: config.pollMs,
+    site: `${runtime.lat.toFixed(4)}, ${runtime.lon.toFixed(4)}`,
+    positionSource: currentSite().positionSource,
+    rangeNm: runtime.rangeNm,
+    pollMs: runtime.pollMs,
   },
   'SKYWATCH receiver online',
 );
