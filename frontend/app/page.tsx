@@ -1,15 +1,16 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import BootSequence from '@/components/BootSequence';
+import ContactCallout from '@/components/ContactCallout';
 import HoloScope from '@/components/HoloScope';
 import RadarScope, { type Symbology } from '@/components/RadarScope';
-import Readout from '@/components/Readout';
 import { ScopeControls, ScopeLegend, SiteBlock } from '@/components/ScopeHud';
 import SettingsPanel from '@/components/SettingsPanel';
 import StatusRail, { type ScopeView } from '@/components/StatusRail';
 import StripBay from '@/components/StripBay';
 import { applyTheme, DEFAULT_THEME } from '@/lib/themes';
+import { emptyPoint } from '@/lib/trackedPoint';
 import { useContactTone } from '@/lib/useContactTone';
 import { useRadarFeed } from '@/lib/useRadarFeed';
 
@@ -31,6 +32,8 @@ export default function Console() {
   const [terrain, setTerrain] = useState<string>('relief');
   const [theme, setTheme] = useState<string>(DEFAULT_THEME);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Written by whichever view is mounted, read by the callout's own frame loop.
+  const pointRef = useRef(emptyPoint());
 
   const config = snapshot?.config ?? null;
   const aircraft = useMemo(() => snapshot?.aircraft ?? [], [snapshot]);
@@ -133,7 +136,7 @@ export default function Console() {
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           <section className="flex min-h-0 flex-1 flex-col">
-            <div className="relative min-h-0 flex-1 p-3 max-lg:aspect-square">
+            <div className="relative min-h-0 flex-1 max-lg:aspect-square">
               {view === 'holo' ? (
                 <HoloScope
                   aircraft={visible}
@@ -142,6 +145,7 @@ export default function Console() {
                   selectedHex={selectedHex}
                   terrain={terrain}
                   theme={theme}
+                  pointRef={pointRef}
                   onSelect={setSelectedHex}
                 />
               ) : (
@@ -152,6 +156,7 @@ export default function Console() {
                   selectedHex={selectedHex}
                   symbology={symbology}
                   terrain={terrain}
+                  pointRef={pointRef}
                   onSelect={setSelectedHex}
                 />
               )}
@@ -160,7 +165,7 @@ export default function Console() {
                   circular scope cannot reach. */}
               <div className="pointer-events-none absolute inset-0 z-10 hidden lg:block">
                 <ScopeControls
-                  className="pointer-events-auto absolute left-6 top-6"
+                  className="pointer-events-auto absolute left-8 top-8"
                   rangeOptions={rangeOptions}
                   rangeNm={rangeNm}
                   onRange={setRangeNm}
@@ -175,19 +180,26 @@ export default function Console() {
                 <SiteBlock
                   config={config}
                   onEdit={() => setSettingsOpen(true)}
-                  className="absolute bottom-6 left-6 max-w-[15rem]"
+                  className="pointer-events-auto absolute bottom-8 left-8 max-w-[17rem]"
                 />
-                <ScopeLegend terrain={terrain} className="absolute bottom-6 right-6 text-right" />
+                <ScopeLegend terrain={terrain} className="absolute bottom-8 right-8 text-right" />
               </div>
 
+              <ContactCallout
+                aircraft={selected}
+                now={snapshot?.now ?? Date.now()}
+                pointRef={pointRef}
+                onClose={() => setSelectedHex(null)}
+              />
+
               {link !== 'live' && !snapshot ? (
-                <p className="absolute inset-x-0 bottom-6 text-center text-[0.72rem] text-ink-dim">
-                  {error ?? 'Linking to receiver…'}
+                <p className="absolute inset-x-0 bottom-8 text-center text-small text-ink-dim">
+                  {error ?? 'Connecting to the receiver…'}
                 </p>
               ) : null}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-t border-hairline bg-console px-4 py-2 lg:hidden">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-8 gap-y-3 border-t border-hairline px-6 py-4 lg:hidden">
               <ScopeControls
                 rangeOptions={rangeOptions}
                 rangeNm={rangeNm}
@@ -204,7 +216,7 @@ export default function Console() {
             </div>
           </section>
 
-          <aside className="min-h-0 shrink-0 lg:w-[23rem]">
+          <aside className="min-h-0 shrink-0 lg:w-[24rem]">
             <StripBay
               aircraft={visible}
               config={config}
@@ -214,11 +226,11 @@ export default function Console() {
           </aside>
         </div>
 
-        <Readout
-          aircraft={selected}
-          stats={snapshot?.stats ?? null}
-          now={snapshot?.now ?? Date.now()}
-        />
+        {snapshot?.stats?.error ? (
+          <p className="shrink-0 border-t border-hairline px-6 py-3 text-small text-emergency">
+            Receiver: {snapshot.stats.error}
+          </p>
+        ) : null}
       </main>
     </>
   );

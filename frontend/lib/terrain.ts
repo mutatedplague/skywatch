@@ -20,8 +20,6 @@
  * old behaviour and is honoured everywhere.
  */
 
-import { palette, rgbCss } from './themes';
-
 export interface TerrainLayer {
   id: string;
   label: string;
@@ -29,8 +27,8 @@ export interface TerrainLayer {
   url: (z: number, x: number, y: number) => string;
   attribution: string;
   maxZoom: number;
-  /** phosphor recolours to the console's green; natural only dims. */
-  treatment: 'phosphor' | 'natural';
+  /** neutral strips the tiles' colour entirely; natural keeps it, dimmed. */
+  treatment: 'neutral' | 'natural';
 }
 
 export const TERRAIN_NONE = 'none';
@@ -43,7 +41,7 @@ export const TERRAIN_LAYERS: TerrainLayer[] = [
       `https://server.arcgisonline.com/ArcGIS/rest/services/World_Shaded_Relief/MapServer/tile/${z}/${y}/${x}`,
     attribution: 'Esri, USGS',
     maxZoom: 13,
-    treatment: 'phosphor',
+    treatment: 'neutral',
   },
   {
     id: 'imagery',
@@ -60,7 +58,7 @@ export const TERRAIN_LAYERS: TerrainLayer[] = [
     url: (z, x, y) => `https://basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`,
     attribution: '© OpenStreetMap contributors, © CARTO',
     maxZoom: 19,
-    treatment: 'phosphor',
+    treatment: 'neutral',
   },
 ];
 
@@ -232,14 +230,20 @@ export class TerrainRaster {
     if (painted === 0) return;
 
     // Treatment, applied once here so both views get an identical underlay.
-    if (layer.treatment === 'phosphor') {
+    //
+    // Terrain is context, not data, so it stays achromatic: colour on this
+    // console means something (accent = active, amber = in the alert volume,
+    // red = emergency) and a tinted map would compete with all three. Tiles
+    // are also darkened hard, because an underlay that reads as brightly as
+    // the traffic on top of it is not an underlay.
+    if (layer.treatment === 'neutral') {
       ctx.globalCompositeOperation = 'saturation';
       ctx.fillStyle = '#808080';
       ctx.fillRect(0, 0, this.size, this.size);
-      ctx.globalCompositeOperation = 'color';
-      ctx.fillStyle = rgbCss(palette().phosphor);
-      ctx.fillRect(0, 0, this.size, this.size);
     }
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = layer.treatment === 'neutral' ? '#a6a6a6' : '#b4b4b4';
+    ctx.fillRect(0, 0, this.size, this.size);
     ctx.globalCompositeOperation = 'source-over';
 
     this.ready = true;

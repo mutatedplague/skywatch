@@ -13,7 +13,10 @@ interface SegmentedControlProps<T extends string | number> {
   onChange: (value: T) => void;
 }
 
-/** A detented switch, the way a range or symbology control sits on a console. */
+/**
+ * Options set in a row, with the active one marked by the accent and a rule
+ * beneath it. No boxes: the alignment and the rule carry the structure.
+ */
 export default function SegmentedControl<T extends string | number>({
   label,
   options,
@@ -22,9 +25,9 @@ export default function SegmentedControl<T extends string | number>({
   onChange,
 }: SegmentedControlProps<T>) {
   return (
-    <div className="flex items-center gap-2">
-      <span className="text-[0.62rem] tracking-[0.18em] text-ink-dim">{label}</span>
-      <div className="flex border border-hairline" role="group" aria-label={label}>
+    <div className="flex items-baseline gap-3">
+      <span className="w-14 shrink-0 text-micro text-ink-dim">{label}</span>
+      <div className="flex items-baseline gap-3" role="group" aria-label={label}>
         {options.map((option) => {
           const active = option.value === value;
           return (
@@ -33,10 +36,10 @@ export default function SegmentedControl<T extends string | number>({
               type="button"
               onClick={() => onChange(option.value)}
               aria-pressed={active}
-              className={`min-w-11 border-r border-hairline px-2 py-1 text-[0.7rem] tabular-nums transition-colors last:border-r-0 ${
+              className={`border-b pb-0.5 text-small tabular-nums transition-colors ${
                 active
-                  ? 'bg-phosphor/15 text-phosphor'
-                  : 'text-ink-dim hover:bg-phosphor/5 hover:text-ink'
+                  ? 'border-phosphor text-phosphor'
+                  : 'border-transparent text-ink-dim hover:text-ink'
               }`}
             >
               {option.label}
@@ -44,7 +47,7 @@ export default function SegmentedControl<T extends string | number>({
           );
         })}
       </div>
-      {suffix ? <span className="text-[0.62rem] text-ink-dim">{suffix}</span> : null}
+      {suffix ? <span className="text-micro text-ink-dim">{suffix}</span> : null}
     </div>
   );
 }

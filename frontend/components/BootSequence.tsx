@@ -17,14 +17,16 @@ export default function BootSequence({ config, onComplete }: BootSequenceProps) 
   const [fading, setFading] = useState(false);
 
   const lines: Array<[string, string]> = [
-    ['RECEIVER', config?.sourceLabel ?? 'SEARCHING'],
+    ['Receiver', config?.sourceLabel ?? 'Searching'],
+    ['Site', config ? `${config.lat.toFixed(3)}, ${config.lon.toFixed(3)}` : 'No position set'],
+    ['Range', config ? `${config.rangeNm} nm` : '—'],
     [
-      'SITE',
-      config ? `${config.lat.toFixed(3)}, ${config.lon.toFixed(3)}` : 'AWAITING POSITION',
+      'Alert volume',
+      config
+        ? `${config.alertRadiusNm} nm, below ${config.alertAltitudeFt.toLocaleString('en-US')} ft`
+        : '—',
     ],
-    ['RANGE', config ? `${config.rangeNm} NM` : '—'],
-    ['ALERT VOLUME', config ? `${config.alertRadiusNm} NM / ${config.alertAltitudeFt} FT` : '—'],
-    ['SCOPE', 'ONLINE'],
+    ['Scope', 'Ready'],
   ];
 
   useEffect(() => {
@@ -52,20 +54,14 @@ export default function BootSequence({ config, onComplete }: BootSequenceProps) 
         fading ? 'opacity-0' : 'opacity-100'
       }`}
     >
-      <div className="crt-scanlines pointer-events-none absolute inset-0" />
-      <div className="w-[min(30rem,88vw)] px-6">
-        <p className="font-display text-[1.6rem] font-bold tracking-[0.42em] text-phosphor">
-          SKYWATCH
-        </p>
-        <p className="mt-1 text-[0.7rem] tracking-[0.2em] text-ink-dim">
-          ADS-B SURVEILLANCE CONSOLE
-        </p>
-        <dl className="mt-7 space-y-1.5 text-[0.76rem]">
+      <div className="w-[min(26rem,88vw)] px-6">
+        <p className="text-large font-medium tracking-tight text-ink">Skywatch</p>
+        <p className="mt-1 text-small text-ink-dim">ADS-B radar console</p>
+        <dl className="mt-8 space-y-2 text-small">
           {lines.slice(0, visible).map(([label, value]) => (
-            <div key={label} className="flex items-baseline gap-2">
-              <dt className="text-ink-dim">{label}</dt>
-              <dd className="flex-1 border-b border-dotted border-hairline" aria-hidden="true" />
-              <dd className="text-phosphor">{value}</dd>
+            <div key={label} className="settle flex items-baseline gap-4">
+              <dt className="w-28 shrink-0 text-ink-dim">{label}</dt>
+              <dd className="data text-ink">{value}</dd>
             </div>
           ))}
         </dl>

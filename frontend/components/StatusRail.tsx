@@ -8,9 +8,12 @@ import SegmentedControl from './SegmentedControl';
 export type ScopeView = 'scope' | 'holo';
 
 const VIEW_OPTIONS: Array<{ value: ScopeView; label: string }> = [
-  { value: 'scope', label: 'scope' },
-  { value: 'holo', label: 'holo' },
+  { value: 'scope', label: 'Scope' },
+  { value: 'holo', label: 'Holo' },
 ];
+
+const LINK_BUTTON =
+  'border-b border-transparent pb-0.5 text-small text-ink-dim transition-colors hover:border-hairline-lit hover:text-ink';
 
 interface StatusRailProps {
   config: SiteConfig | null;
@@ -26,9 +29,9 @@ interface StatusRailProps {
 }
 
 const LINK_COPY: Record<LinkState, string> = {
-  connecting: 'linking',
-  live: 'linked',
-  lost: 'link lost',
+  connecting: 'Connecting',
+  live: 'Live',
+  lost: 'Disconnected',
 };
 
 export default function StatusRail({
@@ -42,7 +45,7 @@ export default function StatusRail({
   onView,
   onOpenSettings,
 }: StatusRailProps) {
-  const [clock, setClock] = useState<string>('----:--Z');
+  const [clock, setClock] = useState<string>('--:--');
 
   useEffect(() => {
     const tick = () => setClock(formatClock(Date.now()));
@@ -55,68 +58,52 @@ export default function StatusRail({
   const dot = healthy ? 'bg-phosphor' : link === 'connecting' ? 'bg-sodium' : 'bg-emergency';
 
   return (
-    <header className="hud-scan hud-enter relative flex shrink-0 flex-wrap items-center gap-x-6 gap-y-2 border-b border-hairline bg-console px-4 py-2.5">
+    <header className="flex shrink-0 flex-wrap items-baseline gap-x-8 gap-y-3 border-b border-hairline px-6 py-4">
       <div className="flex items-baseline gap-3">
-        <span className="hud-glow hud-flicker font-display text-[1.05rem] font-bold tracking-[0.34em] text-phosphor">
-          SKYWATCH
-        </span>
-        <span className="text-[0.68rem] text-ink-dim">
-          {config ? config.site : 'no site'}
-        </span>
+        <h1 className="text-large font-medium tracking-tight text-ink">Skywatch</h1>
+        <span className="data text-small text-ink-dim">{config ? config.site : 'No site'}</span>
       </div>
 
-      <div className="flex items-center gap-2 text-[0.72rem]">
-        <span className={`inline-block h-1.5 w-1.5 ${dot} ${healthy ? '' : 'alert-pulse'}`} />
-        <span className="text-ink">{config?.sourceLabel ?? 'no receiver'}</span>
+      <div className="flex items-baseline gap-2 text-small">
+        <span className={`inline-block h-1.5 w-1.5 translate-y-[-1px] ${dot}`} />
+        <span className="text-ink">{config?.sourceLabel ?? 'No receiver'}</span>
         <span className="text-ink-dim">{LINK_COPY[link]}</span>
       </div>
 
-      <dl className="flex items-center gap-5 text-[0.72rem]">
-        <Field label="in range" value={String(inRange)} />
-        <Field label="held" value={stats ? String(stats.tracked) : '—'} />
+      <dl className="flex items-baseline gap-7 text-small">
+        <Field label="In range" value={String(inRange)} />
+        <Field label="Held" value={stats ? String(stats.tracked) : '—'} />
         <Field
-          label="nearest"
+          label="Nearest"
           value={stats?.closestNm != null ? `${formatDistance(stats.closestNm)} nm` : '—'}
         />
-        <Field label="latency" value={stats ? `${stats.latencyMs} ms` : '—'} />
+        <Field label="Latency" value={stats ? `${stats.latencyMs} ms` : '—'} />
       </dl>
 
-      <div className="ml-auto flex items-center gap-4">
+      <div className="ml-auto flex items-baseline gap-6">
         {config?.simulated ? (
           <button
             type="button"
             onClick={onOpenSettings}
-            className="chamfer-sm border border-sodium/50 bg-sodium/10 px-2 py-1 text-[0.62rem] tracking-[0.22em] text-sodium transition-colors hover:bg-sodium/20"
-            title="No site position is set, so the receiver is simulating traffic. Set one."
+            className="border-b border-sodium pb-0.5 text-small text-sodium transition-colors hover:text-ink"
           >
-            SIMULATED — SET POSITION
+            Simulated traffic — set a position
           </button>
         ) : null}
 
-        <SegmentedControl label="VIEW" options={VIEW_OPTIONS} value={view} onChange={onView} />
+        <SegmentedControl label="View" options={VIEW_OPTIONS} value={view} onChange={onView} />
 
         {config?.siteEditable !== false ? (
-          <button
-            type="button"
-            onClick={onOpenSettings}
-            className="chamfer-sm border border-hairline px-2.5 py-1 text-[0.66rem] tracking-[0.18em] text-ink-dim transition-colors hover:border-hairline-lit hover:text-ink"
-          >
-            site
+          <button type="button" onClick={onOpenSettings} className={LINK_BUTTON}>
+            Site
           </button>
         ) : null}
 
-        <button
-          type="button"
-          onClick={onToggleAudio}
-          aria-pressed={audio}
-          className="chamfer-sm border border-hairline px-2.5 py-1 text-[0.66rem] tracking-[0.18em] text-ink-dim transition-colors hover:border-hairline-lit hover:text-ink"
-        >
-          {audio ? 'tone on' : 'tone off'}
+        <button type="button" onClick={onToggleAudio} aria-pressed={audio} className={LINK_BUTTON}>
+          {audio ? 'Tone on' : 'Tone off'}
         </button>
 
-        <span className="hud-glow font-display text-[0.95rem] tracking-[0.12em] text-phosphor tabular-nums">
-          {clock}
-        </span>
+        <span className="data text-mid text-ink">{clock}</span>
       </div>
     </header>
   );
@@ -124,9 +111,9 @@ export default function StatusRail({
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-baseline gap-1.5">
+    <div className="flex items-baseline gap-2">
       <dt className="text-ink-dim">{label}</dt>
-      <dd className="text-ink">{value}</dd>
+      <dd className="data text-ink">{value}</dd>
     </div>
   );
 }

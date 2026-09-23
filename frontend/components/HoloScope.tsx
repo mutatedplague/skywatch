@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { iconForAircraft } from '@/lib/aircraftIcons';
@@ -16,6 +16,7 @@ import {
 import { getAircraftSprite } from '@/lib/iconSprites';
 import { TERRAIN_NONE, TerrainRaster } from '@/lib/terrain';
 import { activeThemeId, palette, rgbHex } from '@/lib/themes';
+import type { TrackedPoint } from '@/lib/trackedPoint';
 import type { Aircraft, SiteConfig } from '@/lib/types';
 
 
@@ -32,6 +33,8 @@ interface HoloScopeProps {
   terrain: string;
   /** Active theme id; a change rebuilds the scene with the new palette. */
   theme: string;
+  /** Written each frame with where the locked contact sits, for the callout. */
+  pointRef: RefObject<TrackedPoint>;
   onSelect: (hex: string | null) => void;
 }
 
@@ -70,7 +73,7 @@ function textSprite(text: string, canvas: HTMLCanvasElement, color: string): voi
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = '600 34px "Spline Sans Mono", ui-monospace, monospace';
+  ctx.font = '500 32px "IBM Plex Mono", ui-monospace, monospace';
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   ctx.shadowColor = 'rgba(0,0,0,0.9)';
@@ -86,23 +89,27 @@ export default function HoloScope({
   selectedHex,
   terrain,
   theme,
+  pointRef,
   onSelect,
 }: HoloScopeProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   // The render loop reads live props without being torn down and rebuilt.
   const propsRef = useRef({ aircraft, config, rangeNm, selectedHex, terrain, onSelect });
   propsRef.current = { aircraft, config, rangeNm, selectedHex, terrain, onSelect };
+  const pointTargetRef = useRef(pointRef);
+  pointTargetRef.current = pointRef;
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
 
     const themeColors = palette();
-    const PHOSPHOR = rgbHex(themeColors.phosphor);
+    // Disc, rings, spokes and the altitude ruler are structure, so they take the
+    // neutral ink rather than the accent, which colorFor keeps for traffic.
+    const FURNITURE = rgbHex(themeColors.inkDim);
     const SODIUM = rgbHex(themeColors.sodium);
     const voidColor = rgbHex(themeColors.void);
     const inkDimCss = `rgba(${themeColors.inkDim.join(',')},0.95)`;
-    const phosphorCss = `rgba(${themeColors.phosphor.join(',')},0.85)`;
 
     let renderer: THREE.WebGLRenderer;
     try {
@@ -159,14 +166,14 @@ export default function HoloScope({
     scene.add(furniture);
 
     const discMaterial = new THREE.LineBasicMaterial({
-      color: PHOSPHOR,
+      color: FURNITURE,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.6,
     });
     const innerMaterial = new THREE.LineBasicMaterial({
-      color: PHOSPHOR,
+      color: FURNITURE,
       transparent: true,
-      opacity: 0.16,
+      opacity: 0.22,
     });
 
     const outerRing = new THREE.Line(ringGeometry(DISC_UNITS), discMaterial);
@@ -199,9 +206,9 @@ export default function HoloScope({
         new THREE.Line(
           geometry,
           new THREE.LineBasicMaterial({
-            color: PHOSPHOR,
+            color: FURNITURE,
             transparent: true,
-            opacity: bearing % 90 === 0 ? 0.3 : 0.12,
+            opacity: bearing % 90 === 0 ? 0.34 : 0.12,
           }),
         ),
       );
@@ -216,7 +223,7 @@ export default function HoloScope({
           new THREE.Vector3(0, 0, 0),
           new THREE.Vector3(0, CEILING_UNITS, 0),
         ]),
-        new THREE.LineBasicMaterial({ color: PHOSPHOR, transparent: true, opacity: 0.22 }),
+        new THREE.LineBasicMaterial({ color: FURNITURE, transparent: true, opacity: 0.3 }),
       ),
     );
 
@@ -245,7 +252,7 @@ export default function HoloScope({
             new THREE.Vector3(-3.5, y, 0),
             new THREE.Vector3(3.5, y, 0),
           ]),
-          new THREE.LineBasicMaterial({ color: PHOSPHOR, transparent: true, opacity: 0.3 }),
+          new THREE.LineBasicMaterial({ color: FURNITURE, transparent: true, opacity: 0.38 }),
         ),
       );
       const label = makeLabel(tick.label, inkDimCss, 15);
@@ -261,7 +268,7 @@ export default function HoloScope({
       ['W', -1, 0],
     ];
     for (const [letter, x, z] of cardinals) {
-      const label = makeLabel(letter, phosphorCss, 14);
+      const label = makeLabel(letter, inkDimCss, 14);
       label.position.set(x * DISC_UNITS * 1.06, 1.5, z * DISC_UNITS * 1.06);
       label.center.set(0.5, 0.5);
       furniture.add(label);
@@ -279,7 +286,7 @@ export default function HoloScope({
       new THREE.MeshBasicMaterial({
         map: terrainTexture,
         transparent: true,
-        opacity: 0.38,
+        opacity: 0.45,
         depthWrite: false,
       }),
     );
@@ -483,6 +490,7 @@ export default function HoloScope({
     };
 
     // ---- picking ----------------------------------------------------------
+    const projected = new THREE.Vector3();
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let downAt: { x: number; y: number } | null = null;
@@ -560,6 +568,24 @@ export default function HoloScope({
       syncContacts();
       controls.update();
       renderer.render(scene, camera);
+
+      // Project the locked glyph into CSS pixels for the callout to follow.
+      const target = pointTargetRef.current.current;
+      const locked = propsRef.current.selectedHex;
+      const tracked = locked ? contacts.get(locked) : undefined;
+      if (target && tracked) {
+        projected.setFromMatrixPosition(tracked.glyph.matrixWorld);
+        projected.project(camera);
+        const rect = host.getBoundingClientRect();
+        pointTargetRef.current.current = {
+          x: ((projected.x + 1) / 2) * rect.width,
+          y: ((1 - projected.y) / 2) * rect.height,
+          // z beyond 1 means the point sits behind the camera.
+          visible: projected.z < 1,
+        };
+      } else if (target?.visible) {
+        pointTargetRef.current.current = { x: 0, y: 0, visible: false };
+      }
     };
     render();
 
@@ -598,11 +624,8 @@ export default function HoloScope({
   return (
     <div className="relative h-full w-full overflow-hidden">
       <div ref={hostRef} className="h-full w-full" />
-      {/* Same CRT treatment as the scope, so the two views feel like one console. */}
-      <div className="crt-scanlines pointer-events-none absolute inset-0 opacity-40" />
-      <div className="crt-vignette pointer-events-none absolute inset-0" />
-      <p className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 text-[0.6rem] tracking-[0.18em] text-ink-dim">
-        drag to orbit · scroll to zoom · click a contact to lock
+      <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 text-micro text-ink-dim">
+        Drag to orbit, scroll to zoom, click a contact to lock it
       </p>
     </div>
   );

@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { iconForAircraft, sizeForIcon } from '@/lib/aircraftIcons';
 import { displayName, formatAltitudeBlock } from '@/lib/format';
 import { getAircraftSprite, preloadCommonIcons } from '@/lib/iconSprites';
 import { TERRAIN_NONE, TerrainRaster } from '@/lib/terrain';
 import { activeThemeId, palette, type RGB } from '@/lib/themes';
+import type { TrackedPoint } from '@/lib/trackedPoint';
 import type { Aircraft, SiteConfig } from '@/lib/types';
 
 const SWEEP_PERIOD_MS = 4000;
@@ -17,12 +18,19 @@ let STRIKE: RGB = palette().strike;
 let SODIUM: RGB = palette().sodium;
 let EMERGENCY: RGB = palette().emergency;
 
+// Rings, spokes and bearing labels are structure, so they are drawn in the
+// neutral ink instead of the accent. That keeps colour meaning what it says it
+// means: accent for ordinary traffic, amber inside the alert volume, red for an
+// emergency squawk.
+let FURNITURE: RGB = palette().inkDim;
+
 function syncPalette() {
   const p = palette();
   PHOSPHOR = p.phosphor;
   STRIKE = p.strike;
   SODIUM = p.sodium;
   EMERGENCY = p.emergency;
+  FURNITURE = p.inkDim;
 }
 
 const rgba = (c: RGB, a: number) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
@@ -61,6 +69,8 @@ export interface RadarScopeProps {
   symbology: Symbology;
   /** Terrain layer id, or TERRAIN_NONE. */
   terrain: string;
+  /** Written each frame with where the locked contact sits, for the callout. */
+  pointRef: RefObject<TrackedPoint>;
   onSelect: (hex: string | null) => void;
 }
 
@@ -71,6 +81,7 @@ export default function RadarScope({
   selectedHex,
   symbology,
   terrain,
+  pointRef,
   onSelect,
 }: RadarScopeProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -145,7 +156,7 @@ export default function RadarScope({
 
       const cx = width / 2;
       const cy = height / 2;
-      const R = Math.min(width, height) / 2 - 34;
+      const R = Math.min(width, height) / 2 - 26;
       const pxPerNm = R / range;
       const sweepDeg = (((now - start) / SWEEP_PERIOD_MS) * 360) % 360;
 
@@ -175,7 +186,7 @@ export default function RadarScope({
         raster.configure(site.lat, site.lon, range * 2, terrainId, activeThemeId());
         if (raster.ready) {
           ctx.save();
-          ctx.globalAlpha = 0.42;
+          ctx.globalAlpha = 0.4;
           ctx.drawImage(raster.canvas, cx - R, cy - R, R * 2, R * 2);
           ctx.restore();
         }
@@ -189,6 +200,7 @@ export default function RadarScope({
       const hits: Hit[] = [];
       const labelBoxes: Box[] = [];
       const showAllLabels = fleet.length <= 26;
+      let located = false;
 
       for (const contact of fleet) {
         if (contact.distanceNm > range) continue;
@@ -217,16 +229,23 @@ export default function RadarScope({
 
         if (contact.emergency) drawStateRing(ctx, x, y, now, EMERGENCY, 13);
         else if (contact.overhead) drawStateRing(ctx, x, y, now, SODIUM, 13);
-        if (isSelected) drawLock(ctx, x, y, now);
+        if (isSelected) {
+          located = true;
+          if (pointRef.current) pointRef.current = { x, y, visible: true };
+        }
 
         const wants =
-          isSelected || isHovered || contact.emergency || contact.overhead || showAllLabels;
+          !isSelected && (isHovered || contact.emergency || contact.overhead || showAllLabels);
         if (wants) {
           drawDataBlock(ctx, x, y, contact, base, alpha, labelBoxes, isSelected || isHovered, R, cx, cy);
         }
       }
 
       hitsRef.current = hits;
+      // The locked contact may have left range or gone stale since last frame.
+      if (!located && pointRef.current?.visible) {
+        pointRef.current = { x: 0, y: 0, visible: false };
+      }
       drawSite(ctx, cx, cy, now);
       ctx.restore();
 
@@ -259,9 +278,6 @@ export default function RadarScope({
         }}
         onClick={(event) => onSelect(pickAt(event.clientX, event.clientY))}
       />
-      <div className="crt-scanlines pointer-events-none absolute inset-0" />
-      <div className="crt-vignette pointer-events-none absolute inset-0" />
-      <div className="crt-noise pointer-events-none absolute inset-0" />
     </div>
   );
 }
@@ -275,7 +291,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, cx: number, cy: number, R: numb
     const r = (R * i) / 4;
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.strokeStyle = rgba(PHOSPHOR, i === 4 ? 0.22 : 0.12);
+    ctx.strokeStyle = rgba(FURNITURE, i === 4 ? 0.5 : 0.26);
     ctx.stroke();
   }
 
@@ -286,7 +302,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, cx: number, cy: number, R: numb
     ctx.beginPath();
     ctx.moveTo(cx + inner * Math.cos(angle), cy + inner * Math.sin(angle));
     ctx.lineTo(cx + R * Math.cos(angle), cy + R * Math.sin(angle));
-    ctx.strokeStyle = rgba(PHOSPHOR, major ? 0.1 : 0.18);
+    ctx.strokeStyle = rgba(FURNITURE, major ? 0.24 : 0.1);
     ctx.stroke();
   }
 }
@@ -321,7 +337,7 @@ function drawSweep(
   for (let i = 0; i < segments; i += 1) {
     const a1 = sweepDeg - (i * SWEEP_SPREAD_DEG) / segments;
     const a0 = sweepDeg - ((i + 1) * SWEEP_SPREAD_DEG) / segments;
-    const alpha = 0.13 * (1 - i / segments) ** 2.4;
+    const alpha = 0.16 * (1 - i / segments) ** 2.2;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, R, bearingToCanvas(a0), bearingToCanvas(a1));
@@ -331,16 +347,12 @@ function drawSweep(
   }
 
   const angle = bearingToCanvas(sweepDeg);
-  ctx.save();
-  ctx.shadowBlur = 12;
-  ctx.shadowColor = rgba(STRIKE, 0.8);
   ctx.beginPath();
   ctx.moveTo(cx, cy);
   ctx.lineTo(cx + R * Math.cos(angle), cy + R * Math.sin(angle));
-  ctx.strokeStyle = rgba(STRIKE, 0.5);
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = rgba(PHOSPHOR, 0.42);
+  ctx.lineWidth = 1;
   ctx.stroke();
-  ctx.restore();
 }
 
 function drawTrails(
@@ -481,26 +493,6 @@ function drawStateRing(
   ctx.stroke();
 }
 
-function drawLock(ctx: CanvasRenderingContext2D, x: number, y: number, now: number) {
-  const size = 15;
-  const spin = (now / 2600) % (Math.PI * 2);
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(spin);
-  ctx.strokeStyle = rgba(STRIKE, 0.85);
-  ctx.lineWidth = 1.2;
-  for (let corner = 0; corner < 4; corner += 1) {
-    ctx.save();
-    ctx.rotate((corner * Math.PI) / 2);
-    ctx.beginPath();
-    ctx.moveTo(size, size - 6);
-    ctx.lineTo(size, size);
-    ctx.lineTo(size - 6, size);
-    ctx.stroke();
-    ctx.restore();
-  }
-  ctx.restore();
-}
 
 function drawDataBlock(
   ctx: CanvasRenderingContext2D,
@@ -602,9 +594,9 @@ function drawBezel(ctx: CanvasRenderingContext2D, cx: number, cy: number, R: num
     const lx = cx + (R + 17) * Math.cos(angle);
     const ly = cy + (R + 17) * Math.sin(angle);
     ctx.font = cardinal
-      ? '600 12px "Chakra Petch", sans-serif'
-      : '400 9px "Spline Sans Mono", monospace';
-    ctx.fillStyle = rgba(PHOSPHOR, cardinal ? 0.85 : 0.4);
+      ? '500 12px "IBM Plex Sans", sans-serif'
+      : '400 10px "IBM Plex Mono", monospace';
+    ctx.fillStyle = rgba(FURNITURE, cardinal ? 0.95 : 0.5);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(label, lx, ly);
@@ -628,7 +620,7 @@ function drawRangeLabels(
     const text = value < 10 ? value.toFixed(1) : String(Math.round(value));
     // Labels sit on the 045 radial, out of the way of most traffic.
     const angle = bearingToCanvas(45);
-    ctx.fillStyle = rgba(PHOSPHOR, 0.38);
+    ctx.fillStyle = rgba(FURNITURE, 0.55);
     ctx.fillText(text, cx + r * Math.cos(angle) + 3, cy + r * Math.sin(angle) - 5);
   }
 }

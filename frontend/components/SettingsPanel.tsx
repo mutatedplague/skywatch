@@ -102,7 +102,7 @@ export default function SettingsPanel({ config, onClose }: SettingsPanelProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/80 p-4 py-10 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/85 p-4 py-12"
       role="dialog"
       aria-modal="true"
       aria-label="Site and airspace settings"
@@ -112,18 +112,16 @@ export default function SettingsPanel({ config, onClose }: SettingsPanelProps) {
     >
       <form
         onSubmit={onSave}
-        className="chamfer panel w-full max-w-[26rem] p-5"
+        className="w-full max-w-[28rem] border border-hairline bg-console p-8"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <h2 className="font-display text-[0.9rem] font-bold tracking-[0.26em] text-phosphor">
-          SITE &amp; AIRSPACE
-        </h2>
-        <p className="mt-1 text-[0.66rem] leading-relaxed text-ink-dim">
-          Everything on the scope is measured from this position. Saved on the receiver, so
-          every console sees the change.
+        <h2 className="text-large font-medium tracking-tight text-ink">Site and airspace</h2>
+        <p className="mt-2 max-w-[42ch] text-small leading-relaxed text-ink-dim">
+          Everything on the scope is measured from this position. Changes save on the receiver, so
+          every console sees them.
         </p>
 
-        <Field label="SITE NAME">
+        <Field label="Site name">
           <input
             ref={firstFieldRef}
             value={site}
@@ -134,7 +132,7 @@ export default function SettingsPanel({ config, onClose }: SettingsPanelProps) {
         </Field>
 
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <Field label="LATITUDE">
+          <Field label="Latitude">
             <input
               value={lat}
               inputMode="decimal"
@@ -152,7 +150,7 @@ export default function SettingsPanel({ config, onClose }: SettingsPanelProps) {
               className={INPUT}
             />
           </Field>
-          <Field label="LONGITUDE">
+          <Field label="Longitude">
             <input
               value={lon}
               inputMode="decimal"
@@ -171,23 +169,25 @@ export default function SettingsPanel({ config, onClose }: SettingsPanelProps) {
           </Field>
         </div>
 
-        <div className="mt-1.5 flex items-center justify-between gap-3">
-          <span className="text-[0.6rem] text-ink-dim">decimal degrees · S and W negative</span>
+        <div className="mt-2 flex items-baseline justify-between gap-4">
+          <span className="text-micro text-ink-dim">
+            Decimal degrees. South and west are negative.
+          </span>
           <button type="button" onClick={useThisDevice} disabled={locating} className={GHOST}>
-            {locating ? 'locating…' : 'use this device'}
+            {locating ? 'Locating…' : 'Use this device'}
           </button>
         </div>
 
-        <hr className="rule my-4" />
+        <hr className="my-7 border-hairline" />
 
-        <h3 className="text-[0.62rem] tracking-[0.2em] text-ink-dim">ALERT VOLUME</h3>
-        <p className="mt-1 text-[0.66rem] leading-relaxed text-ink-dim">
+        <h3 className="text-base font-medium text-ink">Alert volume</h3>
+        <p className="mt-2 max-w-[42ch] text-small leading-relaxed text-ink-dim">
           A contact inside this radius <em className="not-italic text-ink">and</em> below this
-          height counts as overhead: amber on the scope, promoted in the strip bay.
+          height counts as overhead: amber on the scope, and listed first.
         </p>
 
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <Field label="ALERT RADIUS" suffix="nm">
+          <Field label="Alert radius" suffix="nm">
             <input
               value={alertRadiusNm}
               inputMode="decimal"
@@ -195,7 +195,7 @@ export default function SettingsPanel({ config, onClose }: SettingsPanelProps) {
               className={INPUT}
             />
           </Field>
-          <Field label="ALERT CEILING" suffix="ft">
+          <Field label="Alert ceiling" suffix="ft">
             <input
               value={alertAltitudeFt}
               inputMode="numeric"
@@ -205,7 +205,7 @@ export default function SettingsPanel({ config, onClose }: SettingsPanelProps) {
           </Field>
         </div>
 
-        <Field label="RECEIVER RANGE" suffix="nm">
+        <Field label="Receiver range" suffix="nm">
           <input
             value={rangeNm}
             inputMode="decimal"
@@ -213,22 +213,20 @@ export default function SettingsPanel({ config, onClose }: SettingsPanelProps) {
             className={INPUT}
           />
         </Field>
-        <p className="mt-1.5 text-[0.6rem] text-ink-dim">
-          How far out traffic is pulled, 5–250. The scope zooms within it.
+        <p className="mt-2 text-micro text-ink-dim">
+          How far out traffic is pulled, 5 to 250 nm. The scope zooms within it.
         </p>
 
         {error ? (
-          <p className="chamfer-sm mt-4 border border-emergency/50 bg-emergency/10 px-2.5 py-1.5 text-[0.66rem] text-emergency">
-            {error}
-          </p>
+          <p className="mt-6 border-l-2 border-emergency pl-3 text-small text-emergency">{error}</p>
         ) : null}
 
-        <div className="mt-5 flex items-center gap-2">
+        <div className="mt-8 flex items-baseline gap-5">
           <button type="submit" disabled={busy} className={PRIMARY}>
-            {busy ? 'saving…' : 'save'}
+            {busy ? 'Saving…' : 'Save changes'}
           </button>
           <button type="button" onClick={onClose} className={GHOST}>
-            cancel
+            Cancel
           </button>
           {config.positionSource === 'console' ? (
             <button
@@ -238,7 +236,7 @@ export default function SettingsPanel({ config, onClose }: SettingsPanelProps) {
               className={`${GHOST} ml-auto`}
               title="Discard what the console saved and use the receiver's .env again"
             >
-              revert to .env
+              Revert to .env
             </button>
           ) : null}
         </div>
@@ -248,16 +246,17 @@ export default function SettingsPanel({ config, onClose }: SettingsPanelProps) {
 }
 
 const INPUT =
-  'mt-1 w-full border border-hairline bg-void px-2 py-1.5 text-[0.8rem] text-ink tabular-nums ' +
-  'transition-colors placeholder:text-ink-dim/60 hover:border-hairline-lit focus:border-phosphor focus:outline-none';
+  'data mt-1.5 w-full border-b border-hairline bg-transparent pb-1.5 text-base text-ink ' +
+  'transition-colors placeholder:text-ink-dim/60 hover:border-hairline-lit ' +
+  'focus:border-phosphor focus:outline-none';
 
 const PRIMARY =
-  'chamfer-sm border border-phosphor/60 bg-phosphor/15 px-4 py-1.5 text-[0.7rem] tracking-[0.18em] ' +
-  'text-phosphor transition-colors hover:bg-phosphor/25 disabled:opacity-50';
+  'border-b border-phosphor pb-0.5 text-base text-phosphor transition-colors ' +
+  'hover:text-ink disabled:opacity-50';
 
 const GHOST =
-  'chamfer-sm border border-hairline px-3 py-1.5 text-[0.66rem] tracking-[0.16em] text-ink-dim ' +
-  'transition-colors hover:border-hairline-lit hover:text-ink disabled:opacity-50';
+  'border-b border-transparent pb-0.5 text-small text-ink-dim transition-colors ' +
+  'hover:border-hairline-lit hover:text-ink disabled:opacity-50';
 
 function Field({
   label,
@@ -269,10 +268,10 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="mt-3 block">
-      <span className="flex items-baseline justify-between text-[0.62rem] tracking-[0.18em] text-ink-dim">
+    <label className="mt-6 block">
+      <span className="flex items-baseline justify-between text-micro text-ink-dim">
         {label}
-        {suffix ? <span className="tracking-normal">{suffix}</span> : null}
+        {suffix ? <span>{suffix}</span> : null}
       </span>
       {children}
     </label>

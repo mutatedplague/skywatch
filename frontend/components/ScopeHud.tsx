@@ -7,18 +7,21 @@ import SegmentedControl from './SegmentedControl';
 import type { Symbology } from './RadarScope';
 
 const SYMBOLOGY_OPTIONS: Array<{ value: Symbology; label: string }> = [
-  { value: 'icons', label: 'icons' },
-  { value: 'blips', label: 'blips' },
+  { value: 'icons', label: 'Silhouettes' },
+  { value: 'blips', label: 'Blips' },
 ];
 
 const THEME_OPTIONS: Array<{ value: string; label: string }> = THEMES.map((theme) => ({
   value: theme.id,
-  label: theme.label,
+  label: theme.label.charAt(0).toUpperCase() + theme.label.slice(1),
 }));
 
 const TERRAIN_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: TERRAIN_NONE, label: 'off' },
-  ...TERRAIN_LAYERS.map((layer) => ({ value: layer.id, label: layer.label })),
+  { value: TERRAIN_NONE, label: 'Off' },
+  ...TERRAIN_LAYERS.map((layer) => ({
+    value: layer.id,
+    label: layer.label.charAt(0).toUpperCase() + layer.label.slice(1),
+  })),
 ];
 
 interface ScopeControlsProps {
@@ -50,9 +53,9 @@ export function ScopeControls({
   className = '',
 }: ScopeControlsProps) {
   return (
-    <div className={`flex flex-wrap items-center gap-x-5 gap-y-2 lg:flex-col lg:items-start ${className}`}>
+    <div className={`flex flex-wrap items-baseline gap-x-8 gap-y-3 lg:flex-col lg:items-start ${className}`}>
       <SegmentedControl
-        label="RANGE"
+        label="Range"
         options={rangeOptions}
         value={rangeNm}
         suffix="nm"
@@ -60,19 +63,19 @@ export function ScopeControls({
       />
       {showSymbology ? (
         <SegmentedControl
-          label="SYMBOLS"
+          label="Symbols"
           options={SYMBOLOGY_OPTIONS}
           value={symbology}
           onChange={onSymbology}
         />
       ) : null}
       <SegmentedControl
-        label="TERRAIN"
+        label="Terrain"
         options={TERRAIN_OPTIONS}
         value={terrain}
         onChange={onTerrain}
       />
-      <SegmentedControl label="THEME" options={THEME_OPTIONS} value={theme} onChange={onTheme} />
+      <SegmentedControl label="Accent" options={THEME_OPTIONS} value={theme} onChange={onTheme} />
     </div>
   );
 }
@@ -93,25 +96,24 @@ export function SiteBlock({
   const lon = `${Math.abs(config.lon).toFixed(4)}° ${config.lon >= 0 ? 'E' : 'W'}`;
 
   return (
-    <dl className={`hud-frame hud-scan space-y-0.5 bg-console/40 p-2.5 text-[0.62rem] leading-relaxed ${className}`}>
-      <Row label="SITE" value={config.site} />
-      <Row label="POS" value={`${lat}  ${lon}`} />
-      <Row label="FEED" value={config.sourceLabel} />
+    <dl className={`space-y-1.5 text-micro ${className}`}>
+      <Row label="Site" value={config.site} />
+      <Row label="Position" value={`${lat}  ${lon}`} />
+      <Row label="Receiver" value={config.sourceLabel} />
       <Row
-        label="ALERT"
-        value={`${config.alertRadiusNm} nm below ${config.alertAltitudeFt.toLocaleString('en-US')}′`}
+        label="Alert"
+        value={`${config.alertRadiusNm} nm, below ${config.alertAltitudeFt.toLocaleString('en-US')} ft`}
       />
-      <Row label="SWEEP" value="15 rpm" />
       {onEdit && config.siteEditable !== false ? (
-        <div className="flex gap-2 pt-1">
-          <dt className="w-11 shrink-0" />
+        <div className="flex gap-3 pt-1">
+          <dt className="w-16 shrink-0" />
           <dd>
             <button
               type="button"
               onClick={onEdit}
-              className="text-ink-dim underline-offset-2 transition-colors hover:text-phosphor hover:underline"
+              className="border-b border-hairline-lit pb-0.5 text-ink-dim transition-colors hover:text-ink"
             >
-              edit site &amp; airspace
+              Edit site and airspace
             </button>
           </dd>
         </div>
@@ -122,9 +124,9 @@ export function SiteBlock({
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex gap-2">
-      <dt className="w-11 shrink-0 tracking-[0.14em] text-ink-dim">{label}</dt>
-      <dd className="text-ink">{value}</dd>
+    <div className="flex gap-3">
+      <dt className="w-16 shrink-0 text-ink-dim">{label}</dt>
+      <dd className="data text-ink">{value}</dd>
     </div>
   );
 }
@@ -138,12 +140,12 @@ export function ScopeLegend({
 }) {
   const layer = terrainLayer(terrain);
   return (
-    <div className={`flex flex-col gap-0.5 text-[0.62rem] lg:items-end ${className}`}>
+    <div className={`flex flex-col gap-1 text-micro lg:items-end ${className}`}>
       <p className="text-ink-dim">
-        <span className="text-sodium">amber</span> inside your airspace
+        <span className="text-sodium">Amber</span> inside the alert volume
       </p>
       <p className="text-ink-dim">
-        <span className="text-emergency">red</span> emergency squawk
+        <span className="text-emergency">Red</span> emergency squawk
       </p>
       <a
         href="https://adsb-radar.com"
@@ -153,7 +155,7 @@ export function ScopeLegend({
       >
         Aircraft icons by ADS-B Radar
       </a>
-      {layer ? <p className="text-ink-dim/80">Terrain: {layer.attribution}</p> : null}
+      {layer ? <p className="text-ink-dim">Terrain {layer.attribution}</p> : null}
     </div>
   );
 }
