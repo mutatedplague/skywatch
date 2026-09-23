@@ -1,0 +1,69 @@
+name: skywatch
+
+services:
+  # ADS-B decoder driving your USB RTL-SDR. Started only with the `sdr` profile:
+  #   docker compose --profile sdr up -d
+  # Requires a Linux host — Docker Desktop on macOS and Windows cannot pass a
+  # USB device into a container. See README "Running on macOS".
+  dump1090:
+    build:
+      context: ./dump1090
+      args:
+        DUMP1090_VERSION: ${DUMP1090_VERSION:-v11.1}
+    image: skywatch-dump1090:local
+    profiles: ["sdr"]
+    restart: unless-stopped
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    device_cgroup_rules:
+      - "c 189:* rwm"
+    environment:
+      HOME_LAT: ${HOME_LAT:-}
+      HOME_LON: ${HOME_LON:-}
+      DUMP1090_DEVICE: ${DUMP1090_DEVICE:-}
+      DUMP1090_DEVICE_TYPE: ${DUMP1090_DEVICE_TYPE:-rtlsdr}
+      DUMP1090_GAIN: ${DUMP1090_GAIN:-adaptive}
+      DUMP1090_MAX_RANGE_NM: ${DUMP1090_MAX_RANGE_NM:-300}
+      DUMP1090_EXTRA_ARGS: ${DUMP1090_EXTRA_ARGS:-}
+    ports:
+      - "${DUMP1090_PORT:-8080}:8080"   # aircraft.json + SkyAware-style paths
+      - "30003:30003"                   # SBS/BaseStation feed for other tools
+      - "30005:30005"                   # Beast output
+
+  backend:
+    build: ./backend
+    image: skywatch-backend:local
+    restart: unless-stopped
+    environment:
+      ADSB_SOURCE: ${ADSB_SOURCE:-dump1090}
+      DUMP1090_URL: ${DUMP1090_URL:-http://dump1090:8080/data/aircraft.json}
+      HOME_LAT: ${HOME_LAT:-}
+      HOME_LON: ${HOME_LON:-}
+      SITE_NAME: ${SITE_NAME:-HOME}
+      RANGE_NM: ${RANGE_NM:-100}
+      ALERT_RADIUS_NM: ${ALERT_RADIUS_NM:-3}
+      ALERT_ALTITUDE_FT: ${ALERT_ALTITUDE_FT:-12000}
+      STALE_SECONDS: ${STALE_SECONDS:-75}
+      POLL_MS: ${POLL_MS:-}
+      OPENSKY_CLIENT_ID: ${OPENSKY_CLIENT_ID:-}
+      OPENSKY_CLIENT_SECRET: ${OPENSKY_CLIENT_SECRET:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      PORT: "4000"
+    ports:
+      - "${BACKEND_PORT:-4000}:4000"
+    # Lets ADSB_SOURCE=dump1090 reach a decoder running on the host itself.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_PORT: ${BACKEND_PORT:-4000}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
+    image: skywatch-frontend:local
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
