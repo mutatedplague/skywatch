@@ -3,8 +3,8 @@ import { currentSite } from './site.js';
 
 /**
  * The live configuration. Static settings pass straight through from the
- * environment; the site position and everything derived from it are read fresh
- * on every access, because the console can move the site while we are running.
+ * environment; the site, the feed and everything derived from them are read
+ * fresh on every access, because the console can change them while we run.
  */
 export const runtime: Config = {
   get port() {
@@ -28,7 +28,8 @@ export const runtime: Config = {
   },
   /** Without a position there is nothing to measure from, so simulate instead. */
   get source(): SourceName {
-    return currentSite().positionSource === 'none' ? 'demo' : env.requestedSource;
+    const site = currentSite();
+    return site.positionSource === 'none' ? 'demo' : (site.source ?? env.requestedSource);
   },
   get simulated() {
     return this.source === 'demo';
@@ -46,13 +47,13 @@ export const runtime: Config = {
     return env.staleSeconds;
   },
   get dump1090Url() {
-    return env.dump1090Url;
+    return currentSite().dump1090Url ?? env.dump1090Url;
   },
   get openskyClientId() {
-    return env.openskyClientId;
+    return currentSite().openskyClientId ?? env.openskyClientId;
   },
   get openskyClientSecret() {
-    return env.openskyClientSecret;
+    return currentSite().openskyClientSecret ?? env.openskyClientSecret;
   },
   get corsOrigin() {
     return env.corsOrigin;

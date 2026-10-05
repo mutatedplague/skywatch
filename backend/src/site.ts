@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { env } from './config.js';
+import { env, isSourceName, SOURCES, type SourceName } from './config.js';
 
 /** Where the position currently in force came from. */
 export type PositionSource = 'env' | 'console' | 'none';
@@ -15,17 +15,30 @@ export interface Site {
   alertRadiusNm: number;
   alertAltitudeFt: number;
   positionSource: PositionSource;
+  /** The address the position was looked up from; null when typed or from .env. */
+  address: string | null;
+  /** The feed chosen from the console; null means ADSB_SOURCE from the environment. */
+  source: SourceName | null;
+  /** Console overrides for the feed's own settings; null falls back to the environment. */
+  dump1090Url: string | null;
+  openskyClientId: string | null;
+  openskyClientSecret: string | null;
 }
 
 /** The shape persisted to disk. Every field is optional: the console may save
  *  an alert volume without ever touching the position, or the other way round. */
-interface StoredSite {
+export interface StoredSite {
   lat?: number | null;
   lon?: number | null;
+  address?: string | null;
   site?: string | null;
   rangeNm?: number | null;
   alertRadiusNm?: number | null;
   alertAltitudeFt?: number | null;
+  source?: SourceName | null;
+  dump1090Url?: string | null;
+  openskyClientId?: string | null;
+  openskyClientSecret?: string | null;
 }
 
 /** Bounds the console is held to. The receiver is the authority, not the form. */
@@ -37,6 +50,9 @@ const LIMITS = {
 
 const STATE_FILE = resolve(env.stateDir, 'site.json');
 const MAX_NAME_LENGTH = 24;
+const MAX_ADDRESS_LENGTH = 160;
+const MAX_URL_LENGTH = 300;
+const MAX_CREDENTIAL_LENGTH = 200;
 
 export class SiteError extends Error {}
 
@@ -63,14 +79,46 @@ function parseCoord(value: unknown, limit: number, label: string): number {
   return parsed;
 }
 
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\u0000-\u001f\u007f]/g;
+
 /** Console labels are silk-screened into a narrow block, so keep them short. */
 function parseName(value: unknown): string {
   if (typeof value !== 'string') throw new SiteError('site name must be text');
-  // eslint-disable-next-line no-control-regex
-  const cleaned = value.replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  const cleaned = value.replace(CONTROL_CHARS, '').trim();
   if (cleaned === '') throw new SiteError('site name cannot be empty');
   if (cleaned.length > MAX_NAME_LENGTH) {
     throw new SiteError(`site name cannot be longer than ${MAX_NAME_LENGTH} characters`);
+  }
+  return cleaned;
+}
+
+/** Free text that may be blank, where blank means "none" rather than an error. */
+function parseText(value: unknown, label: string, max: number): string | null {
+  if (typeof value !== 'string') throw new SiteError(`${label} must be text`);
+  const cleaned = value.replace(CONTROL_CHARS, '').replace(/\s+/g, ' ').trim();
+  if (cleaned === '') return null;
+  if (cleaned.length > max) throw new SiteError(`${label} cannot be longer than ${max} characters`);
+  return cleaned;
+}
+
+function parseSource(value: unknown): SourceName {
+  const cleaned = typeof value === 'string' ? value.trim().toLowerCase() : value;
+  if (!isSourceName(cleaned)) throw new SiteError(`source must be one of ${SOURCES.join(', ')}`);
+  return cleaned;
+}
+
+function parseUrl(value: unknown, label: string): string | null {
+  const cleaned = parseText(value, label, MAX_URL_LENGTH);
+  if (cleaned === null) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(cleaned);
+  } catch {
+    throw new SiteError(`${label} must be a full URL, like http://192.168.1.50:8080/data/aircraft.json`);
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new SiteError(`${label} must start with http:// or https://`);
   }
   return cleaned;
 }
@@ -123,6 +171,11 @@ function storedNumber(value: number | null | undefined, fallback: number): numbe
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+/** A stored string, or null when absent or blank. */
+function storedText(value: string | null | undefined): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+}
+
 function resolveSite(): Site {
   const storedLat = typeof stored.lat === 'number' && Number.isFinite(stored.lat) ? stored.lat : null;
   const storedLon = typeof stored.lon === 'number' && Number.isFinite(stored.lon) ? stored.lon : null;
@@ -140,6 +193,11 @@ function resolveSite(): Site {
     alertRadiusNm: storedNumber(stored.alertRadiusNm, env.alertRadiusNm),
     alertAltitudeFt: storedNumber(stored.alertAltitudeFt, env.alertAltitudeFt),
     positionSource: !located ? 'none' : fromConsole ? 'console' : 'env',
+    address: fromConsole ? storedText(stored.address) : null,
+    source: isSourceName(stored.source) ? stored.source : null,
+    dump1090Url: storedText(stored.dump1090Url),
+    openskyClientId: storedText(stored.openskyClientId),
+    openskyClientSecret: storedText(stored.openskyClientSecret),
   };
 }
 
@@ -159,49 +217,64 @@ function commit(next: StoredSite | null): Site {
   writeStored(next);
   const before = current;
   current = resolveSite();
-  const moved =
-    before.lat !== current.lat ||
-    before.lon !== current.lon ||
-    before.site !== current.site ||
-    before.rangeNm !== current.rangeNm ||
-    before.alertRadiusNm !== current.alertRadiusNm ||
-    before.alertAltitudeFt !== current.alertAltitudeFt ||
-    before.positionSource !== current.positionSource;
-  if (moved) for (const listener of listeners) listener(current);
+  const changed = (Object.keys(current) as Array<keyof Site>).some(
+    (key) => before[key] !== current[key],
+  );
+  if (changed) for (const listener of listeners) listener(current);
   return current;
 }
 
 /**
- * Apply a position and/or name from the console. Throws SiteError on anything
- * malformed so the caller can answer 400 rather than silently drifting.
+ * Validate a patch from the console into stored fields without applying it.
+ * Only the fields present in the patch come back, so the result can be laid
+ * over the saved site (to update it) or over the live config (to try it out).
+ * Throws SiteError on anything malformed so the caller can answer 400.
  */
-export function updateSite(patch: Record<string, unknown>): Site {
-  const next: StoredSite = { ...stored };
+export function parsePatch(patch: Record<string, unknown>): StoredSite {
+  const given = (key: string) => patch[key] !== undefined && patch[key] !== null;
+  const next: StoredSite = {};
 
-  const hasLat = patch.lat !== undefined && patch.lat !== null;
-  const hasLon = patch.lon !== undefined && patch.lon !== null;
-  if (hasLat !== hasLon) {
+  if (given('lat') !== given('lon')) {
     throw new SiteError('lat and lon must be given together');
   }
-  if (hasLat && hasLon) {
+  if (given('lat')) {
     next.lat = parseCoord(patch.lat, 90, 'lat');
     next.lon = parseCoord(patch.lon, 180, 'lon');
+    // A new position without an address must not keep wearing the old one.
+    if (!given('address')) next.address = null;
   }
-
-  if (patch.site !== undefined && patch.site !== null) {
-    next.site = parseName(patch.site);
-  }
+  if (given('address')) next.address = parseText(patch.address, 'address', MAX_ADDRESS_LENGTH);
+  if (given('site')) next.site = parseName(patch.site);
 
   for (const key of ['rangeNm', 'alertRadiusNm', 'alertAltitudeFt'] as const) {
-    if (patch[key] !== undefined && patch[key] !== null) next[key] = parseRange(patch[key], key);
+    if (given(key)) next[key] = parseRange(patch[key], key);
   }
 
-  const touched = Object.keys(next).some((key) => patch[key] !== undefined && patch[key] !== null);
-  if (!touched) {
-    throw new SiteError(
-      'nothing to change: send lat and lon, site, rangeNm, alertRadiusNm or alertAltitudeFt',
+  if (given('source')) next.source = parseSource(patch.source);
+  if (given('dump1090Url')) next.dump1090Url = parseUrl(patch.dump1090Url, 'dump1090Url');
+  if (given('openskyClientId')) {
+    next.openskyClientId = parseText(patch.openskyClientId, 'openskyClientId', MAX_CREDENTIAL_LENGTH);
+  }
+  if (given('openskyClientSecret')) {
+    next.openskyClientSecret = parseText(
+      patch.openskyClientSecret,
+      'openskyClientSecret',
+      MAX_CREDENTIAL_LENGTH,
     );
   }
+
+  return next;
+}
+
+/** Apply a patch from the console and tell every listener what changed. */
+export function updateSite(patch: Record<string, unknown>): Site {
+  const parsed = parsePatch(patch);
+  if (Object.keys(parsed).length === 0) {
+    throw new SiteError(
+      'nothing to change: send lat and lon, address, site, source, rangeNm, alertRadiusNm or alertAltitudeFt',
+    );
+  }
+  const next: StoredSite = { ...stored, ...parsed };
 
   // The alert volume has to sit inside the airspace the receiver actually pulls.
   const effectiveRange = storedNumber(next.rangeNm, env.rangeNm);

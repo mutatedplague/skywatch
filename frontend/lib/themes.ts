@@ -122,6 +122,12 @@ export const THEMES: Theme[] = [
 
 export const DEFAULT_THEME = 'green';
 
+/** The palettes as a control's options, labelled for the interface. */
+export const THEME_OPTIONS: Array<{ value: string; label: string }> = THEMES.map((theme) => ({
+  value: theme.id,
+  label: theme.label.charAt(0).toUpperCase() + theme.label.slice(1),
+}));
+
 export function themeById(id: string): Theme {
   return THEMES.find((theme) => theme.id === id) ?? (THEMES[0] as Theme);
 }

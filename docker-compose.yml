@@ -51,6 +51,8 @@ services:
       PORT: "4000"
       # Set false to stop the console moving the site from the browser.
       ALLOW_SITE_EDIT: ${ALLOW_SITE_EDIT:-true}
+      # Where the console's address box looks positions up; "off" disables it.
+      GEOCODE_URL: ${GEOCODE_URL:-}
       STATE_DIR: /app/state
     volumes:
       # Keeps a position saved from the console across a container rebuild.

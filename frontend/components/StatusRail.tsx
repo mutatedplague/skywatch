@@ -26,6 +26,8 @@ interface StatusRailProps {
   view: ScopeView;
   onView: (view: ScopeView) => void;
   onOpenSettings: () => void;
+  /** The first-run wizard, for a receiver that has no position at all yet. */
+  onOpenSetup: () => void;
 }
 
 const LINK_COPY: Record<LinkState, string> = {
@@ -44,6 +46,7 @@ export default function StatusRail({
   view,
   onView,
   onOpenSettings,
+  onOpenSetup,
 }: StatusRailProps) {
   const [clock, setClock] = useState<string>('--:--');
 
@@ -81,13 +84,15 @@ export default function StatusRail({
       </dl>
 
       <div className="ml-auto flex items-baseline gap-6">
-        {config?.simulated ? (
+        {config?.simulated && config.siteEditable ? (
           <button
             type="button"
-            onClick={onOpenSettings}
+            onClick={config.positionSource === 'none' ? onOpenSetup : onOpenSettings}
             className="border-b border-sodium pb-0.5 text-small text-sodium transition-colors hover:text-ink"
           >
-            Simulated traffic — set a position
+            {config.positionSource === 'none'
+              ? 'Simulated traffic — set up the station'
+              : 'Simulated traffic — choose a receiver'}
           </button>
         ) : null}
 
@@ -95,7 +100,7 @@ export default function StatusRail({
 
         {config?.siteEditable !== false ? (
           <button type="button" onClick={onOpenSettings} className={LINK_BUTTON}>
-            Site
+            Settings
           </button>
         ) : null}
 

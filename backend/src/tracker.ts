@@ -52,7 +52,10 @@ export class Tracker {
         firstSeen: existing?.aircraft.firstSeen ?? now,
         lastSeen: now,
         emergency: report.squawk !== null && EMERGENCY_SQUAWKS.has(report.squawk),
+        // Taxiing aircraft are inside the volume at an airport site, but they
+        // are not overhead anyone; only something flying can be.
         overhead:
+          !report.onGround &&
           distance <= this.config.alertRadiusNm &&
           report.altitude !== null &&
           report.altitude <= this.config.alertAltitudeFt,

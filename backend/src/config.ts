@@ -34,7 +34,11 @@ function envCoord(name: string, limit: number): number | null {
 
 export type SourceName = 'demo' | 'dump1090' | 'adsblol' | 'airplaneslive' | 'opensky';
 
-const SOURCES: SourceName[] = ['demo', 'dump1090', 'adsblol', 'airplaneslive', 'opensky'];
+export const SOURCES: readonly SourceName[] = ['demo', 'dump1090', 'adsblol', 'airplaneslive', 'opensky'];
+
+export function isSourceName(value: unknown): value is SourceName {
+  return typeof value === 'string' && (SOURCES as readonly string[]).includes(value);
+}
 
 export const DEFAULT_POLL_MS: Record<SourceName, number> = {
   demo: 500,
@@ -45,12 +49,12 @@ export const DEFAULT_POLL_MS: Record<SourceName, number> = {
   opensky: 10000,
 };
 
-const requestedRaw = envStr('ADSB_SOURCE', 'adsblol').toLowerCase();
-const requestedSource: SourceName = SOURCES.includes(requestedRaw as SourceName)
-  ? (requestedRaw as SourceName)
-  : 'adsblol';
+const geocodeRaw = envStr('GEOCODE_URL', 'https://nominatim.openstreetmap.org');
 
-if (!SOURCES.includes(requestedRaw as SourceName)) {
+const requestedRaw = envStr('ADSB_SOURCE', 'adsblol').toLowerCase();
+const requestedSource: SourceName = isSourceName(requestedRaw) ? requestedRaw : 'adsblol';
+
+if (!isSourceName(requestedRaw)) {
   console.warn(`[config] unknown ADSB_SOURCE="${requestedRaw}", falling back to adsblol`);
 }
 
@@ -79,9 +83,9 @@ export interface Config {
 }
 
 /**
- * Settings straight from the environment. `lat`/`lon`/`site` are only the
- * starting point: a position saved from the console takes precedence, so read
- * the live values from `runtime` rather than here.
+ * Settings straight from the environment. The site, the feed and its
+ * credentials are only the starting point: whatever the console saves takes
+ * precedence, so read the live values from `runtime` rather than here.
  */
 export const env = {
   port: envNum('PORT', 4000),
@@ -110,4 +114,6 @@ export const env = {
   allowSiteEdit: envBool('ALLOW_SITE_EDIT', true),
   /** Where a console-saved position is persisted. */
   stateDir: envStr('STATE_DIR', 'state'),
+  /** A Nominatim-compatible geocoder for the address box, or null when off. */
+  geocodeUrl: /^(off|false|no|none|0)$/i.test(geocodeRaw) ? null : geocodeRaw,
 } as const;

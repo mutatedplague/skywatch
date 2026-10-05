@@ -7,6 +7,7 @@ import HoloScope from '@/components/HoloScope';
 import RadarScope, { type Symbology } from '@/components/RadarScope';
 import { ScopeControls, ScopeLegend, SiteBlock } from '@/components/ScopeHud';
 import SettingsPanel from '@/components/SettingsPanel';
+import SetupWizard from '@/components/SetupWizard';
 import StatusRail, { type ScopeView } from '@/components/StatusRail';
 import StripBay from '@/components/StripBay';
 import { applyTheme, DEFAULT_THEME } from '@/lib/themes';
@@ -20,6 +21,7 @@ const SYMBOLOGY_KEY = 'skywatch.symbology';
 const VIEW_KEY = 'skywatch.view';
 const TERRAIN_KEY = 'skywatch.terrain';
 const THEME_KEY = 'skywatch.theme';
+const SETUP_KEY = 'skywatch.setup';
 
 export default function Console() {
   const { snapshot, link, error } = useRadarFeed();
@@ -32,6 +34,9 @@ export default function Console() {
   const [terrain, setTerrain] = useState<string>('relief');
   const [theme, setTheme] = useState<string>(DEFAULT_THEME);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Undecided until the first config arrives: a receiver with no position
+  // anywhere gets the setup wizard, unless this browser skipped it before.
+  const [setup, setSetup] = useState<'pending' | 'open' | 'closed'>('pending');
   // Written by whichever view is mounted, read by the callout's own frame loop.
   const pointRef = useRef(emptyPoint());
 
@@ -39,6 +44,23 @@ export default function Console() {
   const aircraft = useMemo(() => snapshot?.aircraft ?? [], [snapshot]);
 
   useContactTone(aircraft, audio);
+
+  useEffect(() => {
+    if (setup !== 'pending' || !config) return;
+    const skipped = window.localStorage.getItem(SETUP_KEY) === 'skipped';
+    const needed = config.positionSource === 'none' && config.siteEditable && !skipped;
+    setSetup(needed ? 'open' : 'closed');
+  }, [config, setup]);
+
+  const openSetup = () => {
+    window.localStorage.removeItem(SETUP_KEY);
+    setSetup('open');
+  };
+
+  const skipSetup = () => {
+    window.localStorage.setItem(SETUP_KEY, 'skipped');
+    setSetup('closed');
+  };
 
   useEffect(() => {
     const storedRange = Number(window.localStorage.getItem(RANGE_KEY));
@@ -117,8 +139,18 @@ export default function Console() {
     <>
       {booting ? <BootSequence config={config} onComplete={() => setBooting(false)} /> : null}
 
+      {/* Sits under the boot overlay, so the power-on sequence fades into it. */}
+      {setup === 'open' && config ? (
+        <SetupWizard config={config} onComplete={() => setSetup('closed')} onSkip={skipSetup} />
+      ) : null}
+
       {settingsOpen && config ? (
-        <SettingsPanel config={config} onClose={() => setSettingsOpen(false)} />
+        <SettingsPanel
+          config={config}
+          theme={theme}
+          onTheme={setTheme}
+          onClose={() => setSettingsOpen(false)}
+        />
       ) : null}
 
       <main className="flex min-h-dvh flex-col lg:h-dvh lg:overflow-hidden">
@@ -132,6 +164,7 @@ export default function Console() {
           view={view}
           onView={setView}
           onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSetup={openSetup}
         />
 
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
@@ -174,8 +207,6 @@ export default function Console() {
                   showSymbology={view === 'scope'}
                   terrain={terrain}
                   onTerrain={setTerrain}
-                  theme={theme}
-                  onTheme={setTheme}
                 />
                 <SiteBlock
                   config={config}
@@ -209,8 +240,6 @@ export default function Console() {
                 showSymbology={view === 'scope'}
                 terrain={terrain}
                 onTerrain={setTerrain}
-                theme={theme}
-                onTheme={setTheme}
               />
               <ScopeLegend terrain={terrain} />
             </div>

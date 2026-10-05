@@ -1,7 +1,6 @@
 'use client';
 
 import { TERRAIN_LAYERS, TERRAIN_NONE, terrainLayer } from '@/lib/terrain';
-import { THEMES } from '@/lib/themes';
 import type { SiteConfig } from '@/lib/types';
 import SegmentedControl from './SegmentedControl';
 import type { Symbology } from './RadarScope';
@@ -10,11 +9,6 @@ const SYMBOLOGY_OPTIONS: Array<{ value: Symbology; label: string }> = [
   { value: 'icons', label: 'Silhouettes' },
   { value: 'blips', label: 'Blips' },
 ];
-
-const THEME_OPTIONS: Array<{ value: string; label: string }> = THEMES.map((theme) => ({
-  value: theme.id,
-  label: theme.label.charAt(0).toUpperCase() + theme.label.slice(1),
-}));
 
 const TERRAIN_OPTIONS: Array<{ value: string; label: string }> = [
   { value: TERRAIN_NONE, label: 'Off' },
@@ -34,8 +28,6 @@ interface ScopeControlsProps {
   showSymbology?: boolean;
   terrain: string;
   onTerrain: (value: string) => void;
-  theme: string;
-  onTheme: (value: string) => void;
   className?: string;
 }
 
@@ -48,8 +40,6 @@ export function ScopeControls({
   showSymbology = true,
   terrain,
   onTerrain,
-  theme,
-  onTheme,
   className = '',
 }: ScopeControlsProps) {
   return (
@@ -75,7 +65,6 @@ export function ScopeControls({
         value={terrain}
         onChange={onTerrain}
       />
-      <SegmentedControl label="Accent" options={THEME_OPTIONS} value={theme} onChange={onTheme} />
     </div>
   );
 }
@@ -98,6 +87,7 @@ export function SiteBlock({
   return (
     <dl className={`space-y-1.5 text-micro ${className}`}>
       <Row label="Site" value={config.site} />
+      {config.address ? <Row label="Address" value={config.address} clamp /> : null}
       <Row label="Position" value={`${lat}  ${lon}`} />
       <Row label="Receiver" value={config.sourceLabel} />
       <Row
@@ -113,7 +103,7 @@ export function SiteBlock({
               onClick={onEdit}
               className="border-b border-hairline-lit pb-0.5 text-ink-dim transition-colors hover:text-ink"
             >
-              Edit site and airspace
+              Settings
             </button>
           </dd>
         </div>
@@ -122,11 +112,13 @@ export function SiteBlock({
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, clamp = false }: { label: string; value: string; clamp?: boolean }) {
   return (
     <div className="flex gap-3">
       <dt className="w-16 shrink-0 text-ink-dim">{label}</dt>
-      <dd className="data text-ink">{value}</dd>
+      <dd className={`data text-ink ${clamp ? 'line-clamp-2' : ''}`} title={clamp ? value : undefined}>
+        {value}
+      </dd>
     </div>
   );
 }
