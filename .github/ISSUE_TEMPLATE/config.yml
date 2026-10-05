@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/mutatedplague/skywatch/security/advisories/new
+    about: Report privately instead of opening an issue. See SECURITY.md.
+  - name: Getting it running
+    url: https://github.com/mutatedplague/skywatch#quick-start
+    about: The README covers the SDR, the public feeds, macOS and the Raspberry Pi.
