@@ -30,6 +30,13 @@ const MAX_TRAIL_POINTS = 96;
 const RELIEF_RINGS = 48;
 const RELIEF_SEGMENTS = 96;
 const SPOKE_STEPS = 40;
+/**
+ * Gentle country is drawn taller than it is so that it reads from the side:
+ * the relief in view is stretched toward this many units, never beyond this
+ * factor, and never at all once the ground is dramatic enough on its own.
+ */
+const RELIEF_TARGET_UNITS = 10;
+const RELIEF_MAX_FACTOR = 12;
 
 interface HoloScopeProps {
   aircraft: Aircraft[];
@@ -43,6 +50,8 @@ interface HoloScopeProps {
   /** Written each frame with where the locked contact sits, for the callout. */
   pointRef: RefObject<TrackedPoint>;
   onSelect: (hex: string | null) => void;
+  /** How much taller than true the ground is currently drawn; 1 when true or flat. */
+  onRelief?: (factor: number) => void;
 }
 
 interface Contact {
@@ -179,11 +188,12 @@ export default function HoloScope({
   theme,
   pointRef,
   onSelect,
+  onRelief,
 }: HoloScopeProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   // The render loop reads live props without being torn down and rebuilt.
-  const propsRef = useRef({ aircraft, config, rangeNm, selectedHex, terrain, onSelect });
-  propsRef.current = { aircraft, config, rangeNm, selectedHex, terrain, onSelect };
+  const propsRef = useRef({ aircraft, config, rangeNm, selectedHex, terrain, onSelect, onRelief });
+  propsRef.current = { aircraft, config, rangeNm, selectedHex, terrain, onSelect, onRelief };
   const pointTargetRef = useRef(pointRef);
   pointTargetRef.current = pointRef;
 
@@ -268,16 +278,26 @@ export default function HoloScope({
     let reliefVersion = -1;
     let relief = false;
     let datumFt = 0;
+    // See RELIEF_TARGET_UNITS. The factor stretches the drawn ground only;
+    // every stalk still shows the aircraft's true height above the ground
+    // beneath it, so nothing is ever drawn flying through a hill.
+    let reliefFactor = 1;
+    let reportedFactor = 1;
 
     const heightUnits = (ft: number) => ((ft - datumFt) / CEILING_FT) * CEILING_UNITS;
+    const spanUnits = (ft: number) => (ft / CEILING_FT) * CEILING_UNITS;
 
-    /** The ground's height at a scene position, in scene units. */
-    const surfaceY = (x: number, z: number): number => {
-      if (!relief) return 0;
+    /** The true ground elevation at a scene position, in feet. */
+    const groundFt = (x: number, z: number): number => {
+      if (!relief) return datumFt;
       const u = (x / DISC_UNITS + 1) / 2;
       const v = (-z / DISC_UNITS + 1) / 2;
-      return heightUnits(elevation.heightAt(u, v) * FT_PER_M);
+      return elevation.heightAt(u, v) * FT_PER_M;
     };
+
+    /** Where the ground is drawn at a scene position, in scene units. */
+    const surfaceY = (x: number, z: number): number =>
+      relief ? heightUnits(groundFt(x, z)) * reliefFactor : 0;
 
     /** Lay points on the ground, a hair above it so they are not swallowed. */
     const drape = (points: THREE.Vector3[]): THREE.Vector3[] => {
@@ -477,7 +497,9 @@ export default function HoloScope({
       let lowest = Infinity;
       let highest = -Infinity;
       for (let i = 0; i < positions.count; i += 1) {
-        const y = relief ? heightUnits(elevation.heightAt(uvs.getX(i), uvs.getY(i)) * FT_PER_M) : 0;
+        const y = relief
+          ? heightUnits(elevation.heightAt(uvs.getX(i), uvs.getY(i)) * FT_PER_M) * reliefFactor
+          : 0;
         positions.setY(i, y);
         lowest = Math.min(lowest, y);
         highest = Math.max(highest, y);
@@ -487,7 +509,7 @@ export default function HoloScope({
       discGeometry.computeBoundingSphere();
       // Readable from devtools, and the one place the datum is stated in words.
       host.dataset.relief = relief
-        ? `datum ${Math.round(datumFt)} ft, ground ${lowest.toFixed(1)} to ${highest.toFixed(1)} units`
+        ? `datum ${Math.round(datumFt)} ft, ground ${lowest.toFixed(1)} to ${highest.toFixed(1)} units at x${reliefFactor}`
         : 'flat';
     };
 
@@ -669,10 +691,11 @@ export default function HoloScope({
         const [x, z] = groundPosition(item.distanceNm, item.bearingDeg, range);
         // The group stands on the ground; everything in it is measured up from there.
         const ground = surfaceY(x, z);
+        // True height above the ground beneath, whatever that ground is drawn at.
         const lift =
           item.onGround || item.altitude === null
             ? 0
-            : Math.max(0, heightUnits(item.altitude) - ground);
+            : Math.max(0, spanUnits(item.altitude - groundFt(x, z)));
 
         const contact = contacts.get(item.hex) ?? createContact(item.hex);
 
@@ -716,7 +739,7 @@ export default function HoloScope({
         // the ground where it touches it. Rebuilt only when the history, the
         // range or the ground actually changed, not every frame.
         const last = item.trail[item.trail.length - 1];
-        const trailKey = `${item.trail.length}|${last?.t ?? 0}|${range}|${relief}|${reliefVersion}|${datumFt}`;
+        const trailKey = `${item.trail.length}|${last?.t ?? 0}|${range}|${relief}|${reliefVersion}|${datumFt}|${reliefFactor}`;
         if (site && contact.trailKey !== trailKey) {
           const positions = contact.trail.geometry.attributes.position as THREE.BufferAttribute;
           const alphas = contact.trail.geometry.attributes.alpha as THREE.BufferAttribute;
@@ -728,7 +751,8 @@ export default function HoloScope({
             if (rel.distance > range) continue;
             const [px, pz] = groundPosition(rel.distance, rel.bearing, range);
             const pg = surfaceY(px, pz);
-            const py = point.alt === null ? pg : Math.max(pg, heightUnits(point.alt));
+            const py =
+              point.alt === null ? pg : pg + Math.max(0, spanUnits(point.alt - groundFt(px, pz)));
             positions.setXYZ(n, px - x, py - ground, pz - z);
             alphas.setX(n, 0.06 + 0.94 * (i / points.length));
             n += 1;
@@ -846,6 +870,7 @@ export default function HoloScope({
             // Without a map there is no ground to stand on; back to sea level.
             relief = false;
             datumFt = 0;
+            reliefFactor = 1;
             groundChanged = true;
           }
         } else {
@@ -861,10 +886,23 @@ export default function HoloScope({
             relief = elevation.ready;
             // The datum is the site's own elevation, which a range change
             // does not alter, so it holds steady while new tiles load.
-            if (relief) datumFt = elevation.siteHeight * FT_PER_M;
+            if (relief) {
+              datumFt = elevation.siteHeight * FT_PER_M;
+              const trueUnits = spanUnits((elevation.highestM - elevation.lowestM) * FT_PER_M);
+              reliefFactor =
+                trueUnits > 0
+                  ? Math.max(1, Math.min(RELIEF_MAX_FACTOR, Math.round(RELIEF_TARGET_UNITS / trueUnits)))
+                  : 1;
+            }
             groundChanged = true;
           }
         }
+      }
+
+      const factorNow = relief ? reliefFactor : 1;
+      if (factorNow !== reportedFactor) {
+        reportedFactor = factorNow;
+        propsRef.current.onRelief?.(factorNow);
       }
 
       if (range !== lastRange || groundChanged) {

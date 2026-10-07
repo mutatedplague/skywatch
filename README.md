@@ -117,15 +117,17 @@ trail comes up to full strength and its minute ahead goes dashed while
 everything else dims a notch.
 
 With terrain on, the disc becomes the actual ground. The same elevation data
-that shades the relief raises it in 3D on the same vertical scale as the
-aircraft; the site's own elevation is the zero plane, and the flight-level
-ruler shifts to match, so a ridge at 9,000 ft and an aircraft at 9,000 ft sit
-at the same height. Only the shading is exaggerated — the geometry is never —
-which is why gentle country still reads as terrain without a hill ever
-appearing taller than the aircraft above it. Altitude is exaggerated against
-the ground scale on purpose: 45,000 ft is barely 7 nm, which would be flat
-against a 50 nm disc, so the ruler is labelled with real flight levels to keep
-it honest.
+that shades the relief raises it in 3D; the site's own elevation is the zero
+plane, and the flight-level ruler shifts to match. Dramatic country — the
+Rockies, the Alps — is drawn on the same vertical scale as the aircraft, so a
+ridge at 9,000 ft and an aircraft at 9,000 ft sit at the same height. Gentle
+country would vanish at that scale, so it is drawn taller, up to twelve times,
+and the legend says by how much. Two things stay true whatever the ground is
+drawn at: the ruler at the site, and every stalk, which is always the
+aircraft's real height above the ground beneath it. Altitude itself is
+exaggerated against the horizontal on purpose: 45,000 ft is barely 7 nm, which
+would be flat against a 50 nm disc, so the ruler is labelled with real flight
+levels to keep it honest.
 
 ### Reading it
 

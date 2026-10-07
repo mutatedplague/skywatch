@@ -105,9 +105,12 @@ function Row({ label, value, clamp = false }: { label: string; value: string; cl
 
 export function ScopeLegend({
   terrain = TERRAIN_NONE,
+  reliefFactor = 1,
   className = '',
 }: {
   terrain?: string;
+  /** How much taller than true the ground is drawn; stated whenever it is not 1. */
+  reliefFactor?: number;
   className?: string;
 }) {
   const layer = terrainLayer(terrain);
@@ -127,6 +130,12 @@ export function ScopeLegend({
       >
         Aircraft icons by ADS-B Radar
       </a>
+      {layer && reliefFactor > 1 ? (
+        <p className="text-ink-dim">
+          Ground drawn <span className="data text-ink">×{reliefFactor}</span> taller; stalks are
+          true height above it
+        </p>
+      ) : null}
       {layer ? <p className="text-ink-dim">Terrain {layer.attribution}</p> : null}
       {/* Map layers still take their ground heights from the elevation data. */}
       {layer && layer.source !== 'elevation' ? (

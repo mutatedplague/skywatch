@@ -29,6 +29,8 @@ export default function Console() {
   const [terrain, setTerrain] = useState<string>('relief');
   const [theme, setTheme] = useState<string>(DEFAULT_THEME);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Reported by the scene so the legend can say when the ground is drawn taller than true.
+  const [reliefFactor, setReliefFactor] = useState(1);
   // Undecided until the first config arrives: a receiver with no position
   // anywhere gets the setup wizard, unless this browser skipped it before.
   const [setup, setSetup] = useState<'pending' | 'open' | 'closed'>('pending');
@@ -160,6 +162,7 @@ export default function Console() {
                 theme={theme}
                 pointRef={pointRef}
                 onSelect={setSelectedHex}
+                onRelief={setReliefFactor}
               />
 
               {/* On wide screens the console furniture fills the corners the
@@ -178,7 +181,11 @@ export default function Console() {
                   onEdit={() => setSettingsOpen(true)}
                   className="pointer-events-auto absolute bottom-8 left-8 max-w-[17rem]"
                 />
-                <ScopeLegend terrain={terrain} className="absolute bottom-8 right-8 text-right" />
+                <ScopeLegend
+                  terrain={terrain}
+                  reliefFactor={reliefFactor}
+                  className="absolute bottom-8 right-8 text-right"
+                />
               </div>
 
               <ContactCallout
@@ -203,7 +210,7 @@ export default function Console() {
                 terrain={terrain}
                 onTerrain={setTerrain}
               />
-              <ScopeLegend terrain={terrain} />
+              <ScopeLegend terrain={terrain} reliefFactor={reliefFactor} />
             </div>
           </section>
 
