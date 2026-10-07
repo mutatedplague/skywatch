@@ -23,7 +23,7 @@ to edit, no account to make.
   the top of the list, and can ring a tone. The volume is yours to size.
 - **The sky as a volume.** Every contact floats at its real altitude over
   real relief, with its trail behind it and its next minute ahead. Drag to
-  orbit, click to lock. Five themes.
+  orbit, click to lock. Dark or light, five accents.
 - **Runs anywhere Docker does.** A Raspberry Pi in the loft is plenty.
 
 ---
@@ -159,11 +159,11 @@ main list.
 ### Settings
 
 **Settings** in the top rail opens the same fields setup asked for — name,
-position, receiver, alert volume and range — plus the display accent. Station
-changes save on the receiver and are pushed to every connected console, so the
-rings redraw as soon as you hit save. What the console saves wins over `.env`;
-**Revert to .env** puts it back. The accent is this browser's own and applies
-as soon as it is picked.
+position, receiver, alert volume and range — plus the display mode and
+accent. Station changes save on the receiver and are pushed to every connected
+console, so the rings redraw as soon as you hit save. What the console saves
+wins over `.env`; **Revert to .env** puts it back. The look is this browser's
+own and applies as soon as it is picked.
 
 ### Terrain
 
@@ -174,18 +174,24 @@ view, so a river valley in flat country and an alpine ridge each come out
 legible. Over it — and over **satellite** imagery — go the roads, rivers,
 lakes, towns and airports from OpenStreetMap, drawn from vector tiles served
 by [OpenFreeMap](https://openfreemap.org) with no key and no account: major
-roads at any range, smaller ones as you zoom in, airports by ICAO code. Dark
-**streets** is a ready-made map. Every layer means fetching from a server that
-can infer roughly where your site is from what it is asked for; **Off** keeps
-the console from fetching any. Attribution for the active layer is shown in
-the corner of the scope, as those services require.
+roads at any range, smaller ones as you zoom in, airports by ICAO code.
+**Streets** is a ready-made map, in whichever mode the console is in. Every
+layer means fetching from a server that can infer roughly where your site is
+from what it is asked for; **Off** keeps the console from fetching any.
+Attribution for the active layer is shown in the corner of the scope, as those
+services require.
 
 ### Themes
 
-**Accent**, under Settings, picks one of five palettes — the original radar
-green, blue, cyan, violet and a neutral grey — that recolour the chrome, the
-scene and the terrain tint together. Amber alerts and red emergency squawks
-keep their meaning in every theme.
+**Dark** and **Light**, at the top right of the rail, pick the mode: dark for
+a dim room, light for a bright one. The console follows the browser's own
+preference until you choose, remembers the choice, and applies it before the
+page first paints, so it never flashes the other one. Relief, roads and the
+labels in the scene are drawn for the mode in force, not just recoloured.
+**Accent**, under Settings, picks one of five — the original radar green,
+blue, cyan, violet and a neutral grey — that marks what is active and paints
+ordinary traffic. Amber alerts and red emergency squawks keep their meaning in
+every combination.
 
 ---
 

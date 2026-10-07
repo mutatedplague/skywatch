@@ -1,6 +1,7 @@
 'use client';
 
 import { type ElevationRaster, FT_PER_M } from './elevation';
+import type { Mode } from './themes';
 
 /**
  * Shaded relief drawn from the heights themselves, rather than borrowed from
@@ -12,6 +13,10 @@ import { type ElevationRaster, FT_PER_M } from './elevation';
  *
  * Contours are drawn at an interval picked from the relief in view, so a
  * flood plain and an alpine valley each get a readable number of lines.
+ *
+ * On a dark console the ground is a dark grey that lit slopes brighten; on a
+ * light one it is a pale grey that shadowed slopes darken, and contours are
+ * drawn dark rather than bright. Either way the ground stays an underlay.
  */
 
 /** Slope multiplier for lighting only. */
@@ -36,7 +41,12 @@ const clamp = (value: number, low: number, high: number) => Math.min(high, Math.
  * Paint hillshade and contours over the whole target canvas. Returns the
  * contour interval used, in feet, or 0 when the ground was too flat for any.
  */
-export function paintRelief(target: HTMLCanvasElement, elevation: ElevationRaster): number {
+export function paintRelief(
+  target: HTMLCanvasElement,
+  elevation: ElevationRaster,
+  mode: Mode = 'dark',
+): number {
+  const light = mode === 'light';
   const n = elevation.size;
   const h = elevation.heights;
   const mpp = elevation.metresPerPixel;
@@ -66,17 +76,21 @@ export function paintRelief(target: HTMLCanvasElement, elevation: ElevationRaste
       const length = Math.sqrt(dzdx * dzdx + dzdn * dzdn + 1);
       const shade = Math.max(0, (-dzdx * lx - dzdn * ly + lz) / length);
 
-      // Flat ground lands at 0.4; a lit slope climbs toward 0.8, a shadowed
-      // one drops toward black. The contrast is the point.
-      let value = clamp(0.4 + (shade - Math.SQRT1_2) * 1.3, 0.05, 0.82);
-      if (h[i]! <= 0) value *= 0.75;
+      // Dark: flat ground lands at 0.4; a lit slope climbs toward 0.8, a
+      // shadowed one drops toward black. Light: flat ground lands at 0.8 and
+      // the shadows do the work. The contrast is the point either way.
+      let value = light
+        ? clamp(0.8 + (shade - Math.SQRT1_2) * 1.1, 0.3, 0.98)
+        : clamp(0.4 + (shade - Math.SQRT1_2) * 1.3, 0.05, 0.82);
+      if (h[i]! <= 0) value *= light ? 0.88 : 0.75;
 
       if (intervalM > 0) {
         const level = Math.floor(h[i]! / intervalM);
         const crossesEast = x < n - 1 && Math.floor(h[i + 1]! / intervalM) !== level;
         const crossesSouth = y < n - 1 && Math.floor(h[i + n]! / intervalM) !== level;
         if (crossesEast || crossesSouth) {
-          value = Math.min(1, value + (level % INDEX_EVERY === 0 ? 0.34 : 0.2));
+          const weight = level % INDEX_EVERY === 0 ? 0.34 : 0.2;
+          value = light ? Math.max(0, value - weight * 0.9) : Math.min(1, value + weight);
         }
       }
 

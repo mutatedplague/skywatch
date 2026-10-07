@@ -4,16 +4,16 @@
   Swiss/International. The chrome is achromatic — blacks, greys, hairlines —
   and colour is reserved entirely for meaning: the accent marks what is active,
   amber marks a contact inside the alert volume, red marks an emergency squawk.
-  The scope is the only saturated thing on the screen.
+  The traffic is the only saturated thing on the screen.
 
-  Palette values are re-set at runtime by lib/themes.ts, which is the single
-  source of truth for both these custom properties and the canvas layers.
+  These are the dark defaults. lib/themes.ts is the single source of truth for
+  both modes and every accent: it re-sets these custom properties at runtime,
+  and the root layout inlines the stored look before first paint.
 */
 @theme {
   --color-void: #000000;
-  /* Barely raised, and used only where a surface must sit over the scope. */
+  /* Barely raised, and used only where a surface must sit over the scene. */
   --color-console: #0c0d0f;
-  --color-scope: #000000;
   --color-bezel: #121316;
   --color-hairline: #24262a;
   --color-hairline-lit: #3e4147;
@@ -45,6 +45,10 @@
     height: 100%;
   }
 
+  :root {
+    color-scheme: dark;
+  }
+
   body {
     background-color: var(--color-void);
     color: var(--color-ink);
@@ -60,6 +64,15 @@
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.01em;
+  }
+
+  /* Text laid over the scene: a halo in the background colour, so it reads
+     over lit and shadowed ground alike, the way the labels in the scene do. */
+  .hud {
+    text-shadow:
+      0 0 3px var(--color-void),
+      0 0 8px var(--color-void),
+      0 0 14px var(--color-void);
   }
 
   ::selection {

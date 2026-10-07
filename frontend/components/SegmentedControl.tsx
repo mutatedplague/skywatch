@@ -10,6 +10,8 @@ interface SegmentedControlProps<T extends string | number> {
   options: Segment<T>[];
   value: T;
   suffix?: string;
+  /** Keep the label for assistive technology only, where the options speak for themselves. */
+  labelHidden?: boolean;
   onChange: (value: T) => void;
 }
 
@@ -22,11 +24,12 @@ export default function SegmentedControl<T extends string | number>({
   options,
   value,
   suffix,
+  labelHidden = false,
   onChange,
 }: SegmentedControlProps<T>) {
   return (
     <div className="flex items-baseline gap-3">
-      <span className="w-14 shrink-0 text-micro text-ink-dim">{label}</span>
+      {labelHidden ? null : <span className="w-14 shrink-0 text-micro text-ink-dim">{label}</span>}
       <div className="flex items-baseline gap-3" role="group" aria-label={label}>
         {options.map((option) => {
           const active = option.value === value;

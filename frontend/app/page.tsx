@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import BootSequence from '@/components/BootSequence';
 import ContactCallout from '@/components/ContactCallout';
 import HoloScope from '@/components/HoloScope';
@@ -9,7 +9,16 @@ import SettingsPanel from '@/components/SettingsPanel';
 import SetupWizard from '@/components/SetupWizard';
 import StatusRail from '@/components/StatusRail';
 import StripBay from '@/components/StripBay';
-import { applyTheme, DEFAULT_THEME } from '@/lib/themes';
+import {
+  applyTheme,
+  DEFAULT_MODE,
+  DEFAULT_THEME,
+  isMode,
+  MODE_KEY,
+  type Mode,
+  preferredMode,
+  THEME_KEY,
+} from '@/lib/themes';
 import { emptyPoint } from '@/lib/trackedPoint';
 import { useContactTone } from '@/lib/useContactTone';
 import { useRadarFeed } from '@/lib/useRadarFeed';
@@ -17,8 +26,13 @@ import { useRadarFeed } from '@/lib/useRadarFeed';
 const RANGE_STEPS = [5, 10, 25, 50, 100, 150, 250];
 const RANGE_KEY = 'skywatch.range';
 const TERRAIN_KEY = 'skywatch.terrain';
-const THEME_KEY = 'skywatch.theme';
 const SETUP_KEY = 'skywatch.setup';
+
+/** This browser's own look: the mode and the accent. */
+interface Look {
+  theme: string;
+  mode: Mode;
+}
 
 export default function Console() {
   const { snapshot, link, error } = useRadarFeed();
@@ -27,7 +41,9 @@ export default function Console() {
   const [audio, setAudio] = useState(false);
   const [booting, setBooting] = useState(true);
   const [terrain, setTerrain] = useState<string>('relief');
-  const [theme, setTheme] = useState<string>(DEFAULT_THEME);
+  // Unknown until mounted: the pre-paint script in the layout has already
+  // dressed the page from storage, and nothing should repaint over it blind.
+  const [look, setLook] = useState<Look | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   // Reported by the scene so the legend can say when the ground is drawn taller than true.
   const [reliefFactor, setReliefFactor] = useState(1);
@@ -59,14 +75,28 @@ export default function Console() {
     setSetup('closed');
   };
 
+  // Repaints the CSS custom properties and the palette the scene reads. Done
+  // before the state lands rather than in an effect: the scene rebuilds in
+  // its own effect, which runs before this component's, and it must find the
+  // new palette already in place.
+  const adopt = useCallback((next: Look) => {
+    applyTheme(next.theme, next.mode);
+    window.localStorage.setItem(THEME_KEY, next.theme);
+    window.localStorage.setItem(MODE_KEY, next.mode);
+    setLook(next);
+  }, []);
+
   useEffect(() => {
     const storedRange = Number(window.localStorage.getItem(RANGE_KEY));
     if (Number.isFinite(storedRange) && storedRange > 0) setRangeNm(storedRange);
     const storedTerrain = window.localStorage.getItem(TERRAIN_KEY);
     if (storedTerrain) setTerrain(storedTerrain);
-    const storedTheme = window.localStorage.getItem(THEME_KEY);
-    if (storedTheme) setTheme(storedTheme);
-  }, []);
+    const storedMode = window.localStorage.getItem(MODE_KEY);
+    adopt({
+      theme: window.localStorage.getItem(THEME_KEY) ?? DEFAULT_THEME,
+      mode: isMode(storedMode) ? storedMode : preferredMode(),
+    });
+  }, [adopt]);
 
   useEffect(() => {
     window.localStorage.setItem(RANGE_KEY, String(rangeNm));
@@ -76,11 +106,10 @@ export default function Console() {
     window.localStorage.setItem(TERRAIN_KEY, terrain);
   }, [terrain]);
 
-  // Repaints the CSS custom properties and the palette the scene reads.
-  useEffect(() => {
-    applyTheme(theme);
-    window.localStorage.setItem(THEME_KEY, theme);
-  }, [theme]);
+  const theme = look?.theme ?? DEFAULT_THEME;
+  const mode = look?.mode ?? DEFAULT_MODE;
+  const setTheme = (next: string) => adopt({ theme: next, mode });
+  const setMode = (next: Mode) => adopt({ theme, mode: next });
 
   // Never let the view zoom past what the receiver is actually pulling.
   useEffect(() => {
@@ -133,7 +162,9 @@ export default function Console() {
         <SettingsPanel
           config={config}
           theme={theme}
+          mode={mode}
           onTheme={setTheme}
+          onMode={setMode}
           onClose={() => setSettingsOpen(false)}
         />
       ) : null}
@@ -145,6 +176,8 @@ export default function Console() {
           inRange={visible.length}
           link={link}
           audio={audio}
+          mode={mode}
+          onMode={setMode}
           onToggleAudio={() => setAudio((on) => !on)}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenSetup={openSetup}
@@ -159,7 +192,7 @@ export default function Console() {
                 rangeNm={rangeNm}
                 selectedHex={selectedHex}
                 terrain={terrain}
-                theme={theme}
+                look={look ? `${look.mode}/${look.theme}` : ''}
                 pointRef={pointRef}
                 onSelect={setSelectedHex}
                 onRelief={setReliefFactor}
@@ -167,7 +200,7 @@ export default function Console() {
 
               {/* On wide screens the console furniture fills the corners the
                   disc cannot reach. */}
-              <div className="pointer-events-none absolute inset-0 z-10 hidden lg:block">
+              <div className="hud pointer-events-none absolute inset-0 z-10 hidden lg:block">
                 <ScopeControls
                   className="pointer-events-auto absolute left-8 top-8"
                   rangeOptions={rangeOptions}
@@ -196,7 +229,7 @@ export default function Console() {
               />
 
               {link !== 'live' && !snapshot ? (
-                <p className="absolute inset-x-0 bottom-8 text-center text-small text-ink-dim">
+                <p className="hud absolute inset-x-0 bottom-8 text-center text-small text-ink-dim">
                   {error ?? 'Connecting to the receiver…'}
                 </p>
               ) : null}

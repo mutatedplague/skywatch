@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { formatClock, formatDistance } from '@/lib/format';
+import { MODE_OPTIONS, type Mode } from '@/lib/themes';
 import type { FeedStats, LinkState, SiteConfig } from '@/lib/types';
+import SegmentedControl from './SegmentedControl';
 
 const LINK_BUTTON =
   'border-b border-transparent pb-0.5 text-small text-ink-dim transition-colors hover:border-hairline-lit hover:text-ink';
@@ -14,6 +16,9 @@ interface StatusRailProps {
   inRange: number;
   link: LinkState;
   audio: boolean;
+  /** Dark or light, this browser's own; applies as soon as it is picked. */
+  mode: Mode;
+  onMode: (mode: Mode) => void;
   onToggleAudio: () => void;
   onOpenSettings: () => void;
   /** The first-run wizard, for a receiver that has no position at all yet. */
@@ -32,6 +37,8 @@ export default function StatusRail({
   inRange,
   link,
   audio,
+  mode,
+  onMode,
   onToggleAudio,
   onOpenSettings,
   onOpenSetup,
@@ -93,6 +100,8 @@ export default function StatusRail({
         <button type="button" onClick={onToggleAudio} aria-pressed={audio} className={LINK_BUTTON}>
           {audio ? 'Tone on' : 'Tone off'}
         </button>
+
+        <SegmentedControl label="Mode" options={MODE_OPTIONS} value={mode} labelHidden onChange={onMode} />
 
         <span className="data text-mid text-ink">{clock}</span>
       </div>

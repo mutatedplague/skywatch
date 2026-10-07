@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { saveSite, type SitePatch } from '@/lib/api';
-import { THEME_OPTIONS } from '@/lib/themes';
+import { MODE_OPTIONS, type Mode, THEME_OPTIONS } from '@/lib/themes';
 import type { SiteConfig, SourceName } from '@/lib/types';
 import { ErrorLine, Field, GHOST, Hint, INPUT, PRIMARY } from './form';
 import PositionFields, { parsePosition, type PositionValue } from './PositionFields';
@@ -11,13 +11,22 @@ import SourceFields, { type SourceValue } from './SourceFields';
 
 interface SettingsPanelProps {
   config: SiteConfig;
-  /** The accent is this browser's own preference: it applies as soon as it is picked. */
+  /** The look is this browser's own preference: it applies as soon as it is picked. */
   theme: string;
+  mode: Mode;
   onTheme: (theme: string) => void;
+  onMode: (mode: Mode) => void;
   onClose: () => void;
 }
 
-export default function SettingsPanel({ config, theme, onTheme, onClose }: SettingsPanelProps) {
+export default function SettingsPanel({
+  config,
+  theme,
+  mode,
+  onTheme,
+  onMode,
+  onClose,
+}: SettingsPanelProps) {
   const [site, setSite] = useState(config.site);
   const [position, setPosition] = useState<PositionValue>({
     lat: config.positionSource === 'none' ? '' : String(config.lat),
@@ -115,10 +124,14 @@ export default function SettingsPanel({ config, theme, onTheme, onClose }: Setti
         </p>
 
         <h3 className="mt-7 text-base font-medium text-ink">Display</h3>
-        <div className="mt-4">
+        <div className="mt-4 space-y-3">
+          <SegmentedControl label="Mode" options={MODE_OPTIONS} value={mode} onChange={onMode} />
           <SegmentedControl label="Accent" options={THEME_OPTIONS} value={theme} onChange={onTheme} />
         </div>
-        <Hint>Recolours the chrome, the scope and the terrain tint. Amber and red keep their meaning.</Hint>
+        <Hint>
+          Dark for a dim room, light for a bright one; the mode is also in the top rail. The accent
+          marks what is active and paints ordinary traffic. Amber and red keep their meaning.
+        </Hint>
 
         <hr className="my-7 border-hairline" />
 

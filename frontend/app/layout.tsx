@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { bootScript } from '@/lib/themes';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -7,6 +8,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // The dark default; applyTheme keeps it in step with the chosen mode.
   themeColor: '#000000',
   width: 'device-width',
   initialScale: 1,
@@ -14,8 +16,11 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // The pre-paint script writes the stored look onto <html> before React
+    // runs, so its attributes are expected not to match the server's.
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: bootScript() }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link

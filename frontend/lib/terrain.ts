@@ -3,6 +3,7 @@
 import { BasemapOverlay } from './basemap';
 import { ELEVATION_ATTRIBUTION, ElevationRaster } from './elevation';
 import { paintRelief } from './hillshade';
+import type { Mode } from './themes';
 import { cachedTile, requestTile, TILE_PX, tileWindow, zoomFor } from './tiles';
 
 /**
@@ -30,8 +31,8 @@ export interface TerrainLayer {
   label: string;
   /** Drawn from elevation data here, or composited from a tile server. */
   source: 'elevation' | 'tiles';
-  /** Tile URL; note Esri orders the path z/y/x, not z/x/y. */
-  url?: (z: number, x: number, y: number) => string;
+  /** Tile URL, for the console's mode; note Esri orders the path z/y/x, not z/x/y. */
+  url?: (z: number, x: number, y: number, mode: Mode) => string;
   attribution: string;
   maxZoom: number;
   /** neutral strips the tiles' colour entirely; natural keeps it, dimmed. */
@@ -67,7 +68,8 @@ export const TERRAIN_LAYERS: TerrainLayer[] = [
     id: 'streets',
     label: 'streets',
     source: 'tiles',
-    url: (z, x, y) => `https://basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`,
+    url: (z, x, y, mode) =>
+      `https://basemaps.cartocdn.com/${mode === 'light' ? 'light_all' : 'dark_all'}/${z}/${x}/${y}.png`,
     attribution: '© OpenStreetMap contributors, © CARTO',
     maxZoom: 19,
     treatment: 'neutral',
@@ -94,6 +96,7 @@ export class TerrainRaster {
 
   private key = '';
   private layer: TerrainLayer | null = null;
+  private mode: Mode = 'dark';
   /** Redraws the base and the overlay from whatever has arrived so far. */
   private repaint: (() => void) | null = null;
 
@@ -120,16 +123,17 @@ export class TerrainRaster {
    * work when the site, span or layer actually changed, or when pending data
    * has since arrived.
    */
-  configure(lat: number, lon: number, spanNm: number, layerId: string, themeId = ''): void {
+  configure(lat: number, lon: number, spanNm: number, layerId: string, mode: Mode = 'dark'): void {
     const layer = terrainLayer(layerId);
     // Quantise the span so nudging the range slider does not thrash the cache.
     const quantised = Math.round(spanNm * 10) / 10;
-    // themeId is part of the key: the phosphor tint is baked into the raster.
-    const key = `${layer?.id ?? TERRAIN_NONE}|${lat.toFixed(4)}|${lon.toFixed(4)}|${quantised}|${themeId}`;
+    // The mode is part of the key: the picture is painted for a dark or a light console.
+    const key = `${layer?.id ?? TERRAIN_NONE}|${lat.toFixed(4)}|${lon.toFixed(4)}|${quantised}|${mode}`;
     if (key === this.key) return;
 
     this.key = key;
     this.layer = layer;
+    this.mode = mode;
     this.contourIntervalFt = 0;
     this.repaint = null;
 
@@ -146,7 +150,7 @@ export class TerrainRaster {
     if (layer.source === 'elevation') {
       this.elevation.configure(lat, lon, quantised);
       this.repaint = () => {
-        this.contourIntervalFt = paintRelief(this.canvas, this.elevation);
+        this.contourIntervalFt = paintRelief(this.canvas, this.elevation, mode);
         this.finish(ctx, layer);
       };
       if (this.elevation.ready) this.repaint();
@@ -157,7 +161,7 @@ export class TerrainRaster {
 
   /** The overlay goes on last, and the picture is declared ready. */
   private finish(ctx: CanvasRenderingContext2D, layer: TerrainLayer): void {
-    if (layer.overlay) this.basemap.draw(ctx, this.size);
+    if (layer.overlay) this.basemap.draw(ctx, this.size, this.mode);
     this.ready = true;
     this.version += 1;
   }
@@ -174,6 +178,7 @@ export class TerrainRaster {
     if (!window || !layer.url) return;
     const url = layer.url;
     const key = this.key;
+    const mode = this.mode;
 
     const compose = () => {
       // A later configure() supersedes this window; let its tiles drive it.
@@ -189,7 +194,7 @@ export class TerrainRaster {
         for (let tileX = window.firstX; tileX <= window.lastX; tileX += 1) {
           // Wrap east/west so a site near the antimeridian still fills.
           const wrappedX = ((tileX % window.span) + window.span) % window.span;
-          const tileUrl = url(zoom, wrappedX, tileY);
+          const tileUrl = url(zoom, wrappedX, tileY, mode);
           const image = cachedTile(tileUrl) ?? requestTile(tileUrl, compose);
           if (!image) continue;
           ctx.drawImage(
@@ -210,15 +215,21 @@ export class TerrainRaster {
       // Terrain is context, not data, so it stays achromatic: colour on this
       // console means something (accent = active, amber = in the alert volume,
       // red = emergency) and a tinted map would compete with all three. Tiles
-      // are also darkened hard, because an underlay that reads as brightly as
-      // the traffic on top of it is not an underlay.
+      // are also pushed hard toward the background — darkened on a dark
+      // console, lifted toward white on a light one — because an underlay
+      // that reads as strongly as the traffic on top of it is not an underlay.
       if (layer.treatment === 'neutral') {
         ctx.globalCompositeOperation = 'saturation';
         ctx.fillStyle = '#808080';
         ctx.fillRect(0, 0, this.size, this.size);
       }
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.fillStyle = layer.treatment === 'neutral' ? '#a6a6a6' : '#b4b4b4';
+      if (mode === 'light') {
+        ctx.globalCompositeOperation = 'screen';
+        ctx.fillStyle = layer.treatment === 'neutral' ? '#2a2a2a' : '#7a7a7a';
+      } else {
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.fillStyle = layer.treatment === 'neutral' ? '#a6a6a6' : '#b4b4b4';
+      }
       ctx.fillRect(0, 0, this.size, this.size);
       ctx.globalCompositeOperation = 'source-over';
 

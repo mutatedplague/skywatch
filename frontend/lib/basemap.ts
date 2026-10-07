@@ -2,6 +2,7 @@
 
 import { VectorTile, type VectorTileFeature } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
+import type { Mode } from './themes';
 import { TILE_PX, tileWindow, type TileWindow, zoomFor } from './tiles';
 
 /**
@@ -11,7 +12,8 @@ import { TILE_PX, tileWindow, type TileWindow, zoomFor } from './tiles';
  * pixel space the map tiles and the relief use, so everything lines up.
  *
  * Styling is achromatic and quiet on purpose: this is context under the
- * traffic, and colour on the console means something else.
+ * traffic, and colour on the console means something else. The ink is white
+ * on a dark console and black on a light one.
  */
 
 export const BASEMAP_ATTRIBUTION = 'OpenFreeMap, © OpenMapTiles, © OpenStreetMap contributors';
@@ -130,10 +132,15 @@ export class BasemapOverlay {
   }
 
   /** Draw whatever tiles have arrived. Missing ones are requested and will bump. */
-  draw(ctx: CanvasRenderingContext2D, sizePx: number): void {
+  draw(ctx: CanvasRenderingContext2D, sizePx: number, mode: Mode = 'dark'): void {
     const window = this.window;
     const template = this.template;
     if (!window || !template) return;
+    const light = mode === 'light';
+    // Text gets a halo in the ground's own tone, so a name reads on lit and
+    // shadowed slopes alike.
+    const ink = light ? '0,0,0' : '255,255,255';
+    const halo = light ? '255,255,255' : '0,0,0';
     const key = this.key;
     const onLoad = () => {
       if (this.key === key) this.bump();
@@ -176,7 +183,7 @@ export class BasemapOverlay {
       const water = tile.layers.water;
       if (water) {
         const project = place(tileX, tileY, water.extent);
-        ctx.fillStyle = 'rgba(0,0,0,0.45)';
+        ctx.fillStyle = light ? 'rgba(0,0,0,0.16)' : 'rgba(0,0,0,0.45)';
         for (let i = 0; i < water.length; i += 1) {
           const feature = water.feature(i);
           if (feature.type !== 3) continue;
@@ -195,7 +202,7 @@ export class BasemapOverlay {
       const waterway = tile.layers.waterway;
       if (waterway) {
         const project = place(tileX, tileY, waterway.extent);
-        ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+        ctx.strokeStyle = light ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.5)';
         ctx.lineWidth = 1.2;
         for (let i = 0; i < waterway.length; i += 1) {
           const feature = waterway.feature(i);
@@ -208,7 +215,7 @@ export class BasemapOverlay {
     for (const roadClass of ROAD_ORDER) {
       const style = ROADS[roadClass]!;
       if (this.zoom < style.minZoom) continue;
-      ctx.strokeStyle = `rgba(255,255,255,${style.alpha})`;
+      ctx.strokeStyle = `rgba(${ink},${style.alpha})`;
       ctx.lineWidth = style.width;
       for (const { tile, tileX, tileY } of tiles) {
         const roads = tile.layers.transportation;
@@ -245,12 +252,12 @@ export class BasemapOverlay {
           const box = { x: x - 4, y: y - 7, w: width + 14, h: 14 };
           if (overlaps(box, placed)) continue;
           placed.push(box);
-          ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+          ctx.strokeStyle = `rgba(${ink},0.8)`;
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.arc(x, y, 2.5, 0, Math.PI * 2);
           ctx.stroke();
-          this.label(ctx, code, x + 6, y, 0.8);
+          label(ctx, code, x + 6, y, `rgba(${ink},0.8)`, halo);
         }
       }
     }
@@ -274,7 +281,7 @@ export class BasemapOverlay {
           const box = { x: x - width / 2 - 4, y: y - style.px / 2 - 2, w: width + 8, h: style.px + 4 };
           if (overlaps(box, placed)) continue;
           placed.push(box);
-          this.label(ctx, name, x, y, style.alpha);
+          label(ctx, name, x, y, `rgba(${ink},${style.alpha})`, halo);
         }
       }
     }
@@ -298,12 +305,20 @@ export class BasemapOverlay {
     ctx.stroke();
   }
 
-  /** Text with a dark halo, so it reads on lit and shadowed ground alike. */
-  private label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, alpha: number): void {
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0,0,0,0.75)';
-    ctx.strokeText(text, x, y);
-    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-    ctx.fillText(text, x, y);
-  }
+}
+
+/** Text with a halo behind it, so it reads on lit and shadowed ground alike. */
+function label(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  fill: string,
+  halo: string,
+): void {
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = `rgba(${halo},0.75)`;
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
 }

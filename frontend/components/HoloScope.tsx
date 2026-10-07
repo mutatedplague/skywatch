@@ -17,7 +17,7 @@ import {
 } from '@/lib/holoGeometry';
 import { getAircraftSprite } from '@/lib/iconSprites';
 import { TERRAIN_NONE, TerrainRaster } from '@/lib/terrain';
-import { activeThemeId, palette, rgbHex } from '@/lib/themes';
+import { activeMode, palette, rgbHex } from '@/lib/themes';
 import type { TrackedPoint } from '@/lib/trackedPoint';
 import type { Aircraft, SiteConfig } from '@/lib/types';
 
@@ -45,8 +45,8 @@ interface HoloScopeProps {
   selectedHex: string | null;
   /** Terrain layer id, or TERRAIN_NONE. */
   terrain: string;
-  /** Active theme id; a change rebuilds the scene with the new palette. */
-  theme: string;
+  /** A key for the mode and accent in force; a change rebuilds the scene with the new palette. */
+  look: string;
   /** Written each frame with where the locked contact sits, for the callout. */
   pointRef: RefObject<TrackedPoint>;
   onSelect: (hex: string | null) => void;
@@ -173,7 +173,8 @@ function textSprite(text: string, canvas: HTMLCanvasElement, color: string): voi
   ctx.font = '500 32px "IBM Plex Mono", ui-monospace, monospace';
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
-  ctx.shadowColor = 'rgba(0,0,0,0.9)';
+  // A halo in the background colour, so text reads over ground and traffic alike.
+  ctx.shadowColor = `rgba(${palette().void.join(',')},0.9)`;
   ctx.shadowBlur = 8;
   ctx.fillStyle = color;
   ctx.fillText(text, 6, canvas.height / 2);
@@ -185,7 +186,7 @@ export default function HoloScope({
   rangeNm,
   selectedHex,
   terrain,
-  theme,
+  look,
   pointRef,
   onSelect,
   onRelief,
@@ -874,7 +875,7 @@ export default function HoloScope({
             groundChanged = true;
           }
         } else {
-          raster.configure(site.lat, site.lon, range * 2, terrainId, activeThemeId());
+          raster.configure(site.lat, site.lon, range * 2, terrainId, activeMode());
           terrainDisc.visible = raster.ready;
           if (raster.version !== terrainVersion) {
             terrainTexture.needsUpdate = true;
@@ -991,13 +992,13 @@ export default function HoloScope({
       renderer.dispose();
       renderer.domElement.remove();
     };
-    // Materials bake in the palette, so a theme change rebuilds the scene.
-  }, [theme]);
+    // Materials bake in the palette, so a change of look rebuilds the scene.
+  }, [look]);
 
   return (
     <div className="relative h-full w-full overflow-hidden">
       <div ref={hostRef} className="h-full w-full" />
-      <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 text-micro text-ink-dim">
+      <p className="hud pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 text-micro text-ink-dim">
         Drag to orbit, scroll to zoom, click a contact to lock it
       </p>
     </div>
