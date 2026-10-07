@@ -130,7 +130,7 @@ export function ScopeLegend({
   className = '',
 }: {
   terrain?: string;
-  /** True while the hologram is drawing ground heights, which have their own source. */
+  /** True while the 3D view is drawing ground heights, which have their own source. */
   relief?: boolean;
   className?: string;
 }) {

@@ -12,7 +12,7 @@ import {
 } from './terrain';
 
 /**
- * Ground heights for the hologram's relief, covering the same square as the
+ * Ground heights for the 3D view's relief, covering the same square as the
  * terrain raster so the two line up by construction: a texture coordinate on
  * the disc reads the map from one and the height from the other.
  *

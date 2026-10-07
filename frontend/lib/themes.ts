@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * Console themes, in the spirit of eDEX-UI: one palette drives the CSS custom
- * properties, the 2D scope's canvas painting and the 3D hologram's materials,
- * so switching theme recolours the whole console rather than just its chrome.
+ * Console themes: one palette drives the CSS custom properties, the 2D scope's
+ * canvas painting and the 3D view's materials, so switching theme recolours
+ * the whole console rather than just its chrome.
  *
  * This module is the single source of truth. Tailwind's @theme block in
  * globals.css seeds the default values; applyTheme overrides the same custom

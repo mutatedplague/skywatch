@@ -9,7 +9,7 @@ export type ScopeView = 'scope' | 'holo';
 
 const VIEW_OPTIONS: Array<{ value: ScopeView; label: string }> = [
   { value: 'scope', label: 'Scope' },
-  { value: 'holo', label: 'Holo' },
+  { value: 'holo', label: '3D' },
 ];
 
 const LINK_BUTTON =

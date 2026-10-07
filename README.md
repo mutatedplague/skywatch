@@ -112,7 +112,7 @@ and theme controls, the contact list and the track readout.
 **Scope** is the classic plan view: a sweep, phosphor persistence and a
 top-down picture, densest and quickest to read.
 
-**Holo** is a 3D projection of the same picture. Each contact sits at its real
+**3D** is a projection of the same picture. Each contact sits at its real
 altitude above a stalk dropped to its ground position, so height is something
 you see rather than read. Behind every contact is its trail, fading toward the
 tail — approach paths descend, departures climb, a hold is a stacked oval —
@@ -123,7 +123,7 @@ orbit, scroll to zoom, click a contact to lock it: a reticle settles on it, its
 trail comes up to full strength and its minute ahead goes dashed while
 everything else dims a notch.
 
-![The Holo view over Geneva: the Alps raised in relief, traffic stacked above on stalks](docs/holo.jpg)
+![The 3D view over Geneva: the Alps raised in relief, traffic stacked above on stalks](docs/holo.jpg)
 
 With terrain on, the disc becomes the actual ground. Elevation tiles raise the
 relief on the same vertical scale as the aircraft, the site's own elevation is
@@ -181,7 +181,7 @@ the scope, as those services require.
 
 **Accent**, under Settings, picks one of five palettes — the original radar
 green, blue, cyan, violet and a neutral grey — that recolour the chrome, the
-scope, the hologram and the terrain tint together. Amber alerts and red
+scope, the 3D view and the terrain tint together. Amber alerts and red
 emergency squawks keep their meaning in every theme.
 
 ---
@@ -249,7 +249,7 @@ only to the bundled decoder.
 
 Nothing, with your own receiver and terrain off. Otherwise: the chosen feed
 sees your position (it has to, to answer); the terrain tile server, and in the
-Holo view the elevation tile server, can infer it; and the address box sends
+3D view the elevation tile server, can infer it; and the address box sends
 what you type to the geocoder. Each of those is one setting away from off.
 
 ---

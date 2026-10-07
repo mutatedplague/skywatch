@@ -1,5 +1,5 @@
 /**
- * Scene scaling for the holographic view.
+ * Scene scaling for the 3D view.
  *
  * The disc is always DISC_UNITS across whatever range the operator has
  * selected, so the camera never has to move when they zoom — only the nm→unit
