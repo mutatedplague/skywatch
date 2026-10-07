@@ -1,20 +1,11 @@
 'use client';
 
-import {
-  EQUATOR_MPP,
-  latToTileY,
-  lonToTileX,
-  MAX_TILES,
-  METRES_PER_NM,
-  requestTile,
-  TILE_PX,
-  zoomFor,
-} from './terrain';
+import { cachedTile, requestTile, TILE_PX, tileWindow, zoomFor } from './tiles';
 
 /**
- * Ground heights for the 3D view's relief, covering the same square as the
- * terrain raster so the two line up by construction: a texture coordinate on
- * the disc reads the map from one and the height from the other.
+ * Ground heights, covering the same square as the map raster so the two line
+ * up by construction: a texture coordinate on the disc reads the map from one
+ * and the height from the other.
  *
  * Tiles are Terrarium-encoded PNGs from the AWS Terrain Tiles open dataset:
  * height in metres is (R × 256 + G + B / 256) − 32768. They are composited
@@ -24,26 +15,39 @@ import {
 
 const TERRARIUM_URL = (z: number, x: number, y: number) =>
   `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
-/** Finer than this buys nothing at the disc's vertex spacing. */
+/** Finer than this buys nothing at the raster's cell size. */
 const MAX_ZOOM = 13;
 
 export const ELEVATION_ATTRIBUTION = 'Mapzen, AWS Terrain Tiles';
+export const FT_PER_M = 3.28084;
 
 export class ElevationRaster {
   /** Bumped whenever the heights change, so dependants know to rebuild. */
   version = 0;
   /** True once every tile in the window has been decoded. */
   ready = false;
+  /** Metres, row-major, row 0 at the north edge. Valid while `ready`. */
+  readonly heights: Float32Array;
+  /** Ground metres per raster cell, for slopes. Valid while `ready`. */
+  metresPerPixel = 1;
+  lowestM = 0;
+  highestM = 0;
 
   private readonly canvas: HTMLCanvasElement;
-  private heights: Float32Array;
   private key = '';
+  private readonly listeners = new Set<() => void>();
 
-  constructor(readonly size = 160) {
+  constructor(readonly size = 512) {
     this.canvas = document.createElement('canvas');
     this.canvas.width = size;
     this.canvas.height = size;
     this.heights = new Float32Array(size * size);
+  }
+
+  /** Called on every version change: a reset to loading, or new heights. */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   /** Point the raster at a site and span. Cheap to call every frame. */
@@ -54,13 +58,13 @@ export class ElevationRaster {
 
     this.key = key;
     this.ready = false;
-    this.version += 1;
+    this.bump();
     this.paint(lat, lon, quantised);
   }
 
   /**
    * Height in metres at a texture coordinate: u west→east, v south→north,
-   * both 0..1, the same convention as the terrain texture on the disc.
+   * both 0..1, the same convention as the map texture on the disc.
    */
   heightAt(u: number, v: number): number {
     if (!this.ready) return 0;
@@ -84,24 +88,18 @@ export class ElevationRaster {
     return this.heightAt(0.5, 0.5);
   }
 
-  private paint(lat: number, lon: number, spanNm: number): void {
-    // Ask for tiles a few times finer than the raster, so each height cell is
-    // a real sample rather than one source pixel smeared across several.
-    const zoom = zoomFor(lat, spanNm, this.size * 3, MAX_ZOOM);
-    const metresPerTilePixel = (EQUATOR_MPP * Math.cos((lat * Math.PI) / 180)) / 2 ** zoom;
-    const spanTilePx = (spanNm * METRES_PER_NM) / metresPerTilePixel;
-    const centreX = lonToTileX(lon, zoom) * TILE_PX;
-    const centreY = latToTileY(lat, zoom) * TILE_PX;
-    const left = centreX - spanTilePx / 2;
-    const top = centreY - spanTilePx / 2;
-    const scale = this.size / spanTilePx;
+  private bump(): void {
+    this.version += 1;
+    for (const listener of this.listeners) listener();
+  }
 
-    const firstX = Math.floor(left / TILE_PX);
-    const lastX = Math.floor((left + spanTilePx) / TILE_PX);
-    const firstY = Math.floor(top / TILE_PX);
-    const lastY = Math.floor((top + spanTilePx) / TILE_PX);
-    const span = 2 ** zoom;
-    if ((lastX - firstX + 1) * (lastY - firstY + 1) > MAX_TILES) return;
+  private paint(lat: number, lon: number, spanNm: number): void {
+    // Ask for tiles a few times finer than the raster, so each cell is a real
+    // sample rather than one source pixel smeared across several.
+    const zoom = zoomFor(lat, spanNm, this.size * 3, MAX_ZOOM);
+    const window = tileWindow(lat, lon, spanNm, zoom, this.size);
+    if (!window) return;
+    const { left, top, scale, firstX, lastX, firstY, lastY, span } = window;
 
     const key = this.key;
     const compose = () => {
@@ -120,7 +118,8 @@ export class ElevationRaster {
         for (let tileX = firstX; tileX <= lastX; tileX += 1) {
           expected += 1;
           const wrappedX = ((tileX % span) + span) % span;
-          const image = requestTile(TERRARIUM_URL(zoom, wrappedX, tileY), compose);
+          const url = TERRARIUM_URL(zoom, wrappedX, tileY);
+          const image = cachedTile(url) ?? requestTile(url, compose);
           if (!image) continue;
           ctx.drawImage(
             image,
@@ -136,11 +135,19 @@ export class ElevationRaster {
       if (painted === 0 || painted < expected) return;
 
       const { data } = ctx.getImageData(0, 0, this.size, this.size);
+      let lowest = Infinity;
+      let highest = -Infinity;
       for (let i = 0, p = 0; i < this.heights.length; i += 1, p += 4) {
-        this.heights[i] = data[p]! * 256 + data[p + 1]! + data[p + 2]! / 256 - 32768;
+        const metres = data[p]! * 256 + data[p + 1]! + data[p + 2]! / 256 - 32768;
+        this.heights[i] = metres;
+        if (metres < lowest) lowest = metres;
+        if (metres > highest) highest = metres;
       }
+      this.lowestM = lowest;
+      this.highestM = highest;
+      this.metresPerPixel = window.metresPerPixel;
       this.ready = true;
-      this.version += 1;
+      this.bump();
     };
 
     compose();

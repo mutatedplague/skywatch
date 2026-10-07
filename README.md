@@ -125,13 +125,16 @@ everything else dims a notch.
 
 ![The 3D view over Geneva: the Alps raised in relief, traffic stacked above on stalks](docs/holo.jpg)
 
-With terrain on, the disc becomes the actual ground. Elevation tiles raise the
-relief on the same vertical scale as the aircraft, the site's own elevation is
-the zero plane, and the flight-level ruler shifts to match, so a ridge at
-9,000 ft and an aircraft at 9,000 ft sit at the same height. Altitude is
-exaggerated against the ground scale on purpose: 45,000 ft is barely 7 nm,
-which would be flat against a 50 nm disc, so the ruler is labelled with real
-flight levels to keep it honest.
+With terrain on, the disc becomes the actual ground. The same elevation data
+that shades the relief raises it in 3D on the same vertical scale as the
+aircraft; the site's own elevation is the zero plane, and the flight-level
+ruler shifts to match, so a ridge at 9,000 ft and an aircraft at 9,000 ft sit
+at the same height. Only the shading is exaggerated — the geometry is never —
+which is why gentle country still reads as terrain without a hill ever
+appearing taller than the aircraft above it. Altitude is exaggerated against
+the ground scale on purpose: 45,000 ft is barely 7 nm, which would be flat
+against a 50 nm disc, so the ruler is labelled with real flight levels to keep
+it honest.
 
 ### Reading the scope
 
@@ -170,12 +173,15 @@ as soon as it is picked.
 
 ### Terrain
 
-**Terrain** underlays both views with map tiles centred on your site: shaded
-**relief**, **satellite** imagery, or dark **streets**. Relief and streets are
-recoloured into the active theme. Tiles come from a third party that can infer
-roughly where your site is from what it is asked for; **Off** keeps the console
-from fetching any. Attribution for the active layer is shown in the corner of
-the scope, as those services require.
+**Terrain** underlays both views with the ground around your site. **Relief**
+is drawn by the console itself from open elevation data: a hillshade lit from
+the north-west, with contour lines at an interval picked from the relief in
+view, so a river valley in flat country and an alpine ridge each come out
+legible. **Satellite** imagery and dark **streets** are map tiles. Every layer
+means fetching from a server that can infer roughly where your site is from
+what it is asked for; **Off** keeps the console from fetching any. Attribution
+for the active layer is shown in the corner of the scope, as those services
+require.
 
 ### Themes
 
@@ -248,9 +254,9 @@ only to the bundled decoder.
 ### What reaches the internet
 
 Nothing, with your own receiver and terrain off. Otherwise: the chosen feed
-sees your position (it has to, to answer); the terrain tile server, and in the
-3D view the elevation tile server, can infer it; and the address box sends
-what you type to the geocoder. Each of those is one setting away from off.
+sees your position (it has to, to answer); the elevation or map tile server
+behind the terrain layer can infer it; and the address box sends what you type
+to the geocoder. Each of those is one setting away from off.
 
 ---
 

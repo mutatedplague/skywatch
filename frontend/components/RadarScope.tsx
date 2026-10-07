@@ -187,7 +187,7 @@ export default function RadarScope({
         raster.configure(site.lat, site.lon, range * 2, terrainId, activeThemeId());
         if (raster.ready) {
           ctx.save();
-          ctx.globalAlpha = 0.4;
+          ctx.globalAlpha = 0.5;
           ctx.drawImage(raster.canvas, cx - R, cy - R, R * 2, R * 2);
           ctx.restore();
         }

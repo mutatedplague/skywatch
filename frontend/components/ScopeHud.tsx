@@ -152,7 +152,9 @@ export function ScopeLegend({
         Aircraft icons by ADS-B Radar
       </a>
       {layer ? <p className="text-ink-dim">Terrain {layer.attribution}</p> : null}
-      {layer && relief ? <p className="text-ink-dim">Elevation {ELEVATION_ATTRIBUTION}</p> : null}
+      {layer && relief && layer.source !== 'elevation' ? (
+        <p className="text-ink-dim">Elevation {ELEVATION_ATTRIBUTION}</p>
+      ) : null}
     </div>
   );
 }

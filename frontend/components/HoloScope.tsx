@@ -4,7 +4,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { iconForAircraft } from '@/lib/aircraftIcons';
-import { ElevationRaster } from '@/lib/elevation';
+import { FT_PER_M } from '@/lib/elevation';
 import { relative } from '@/lib/geo';
 import {
   altitudeTicks,
@@ -24,7 +24,6 @@ import type { Aircraft, SiteConfig } from '@/lib/types';
 /** Icon plate size in world units — fixed, so glyphs stay legible at any range. */
 const GLYPH_UNITS = 11;
 const SPRITE_PX = 96;
-const FT_PER_M = 3.28084;
 /** The receiver keeps 90 trail points; one more joins the tail to the glyph. */
 const MAX_TRAIL_POINTS = 96;
 /** Relief mesh density: enough vertices for a ridge to read, few enough to displace per frame. */
@@ -264,7 +263,8 @@ export default function HoloScope({
     // is the zero plane, and everything in the scene — aircraft, the ruler,
     // the alert ceiling — is measured from it. The ruler keeps reading MSL,
     // so a flight level still lands where the label says.
-    const elevation = new ElevationRaster(160);
+    const raster = new TerrainRaster(1024);
+    const elevation = raster.elevation;
     let reliefVersion = -1;
     let relief = false;
     let datumFt = 0;
@@ -426,7 +426,6 @@ export default function HoloScope({
     // The map lands on the disc through UVs that cover its bounding square,
     // which is exactly what the raster covers. The same UVs read the heights.
     // It sits a hair below zero so the range rings stay crisply on top of it.
-    const raster = new TerrainRaster(1024);
     const terrainTexture = new THREE.CanvasTexture(raster.canvas);
     terrainTexture.colorSpace = THREE.SRGBColorSpace;
     const discGeometry = polarDiscGeometry(DISC_UNITS, RELIEF_RINGS, RELIEF_SEGMENTS);
@@ -435,7 +434,7 @@ export default function HoloScope({
       new THREE.MeshLambertMaterial({
         map: terrainTexture,
         transparent: true,
-        opacity: 0.5,
+        opacity: 0.62,
         depthWrite: false,
         side: THREE.DoubleSide,
       }),
