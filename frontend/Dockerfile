@@ -3,7 +3,11 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+# npm treats a platform-specific native module as optional, so a failed fetch
+# of the musl build leaves the install "successful" and the build failing
+# later with "Cannot find module lightningcss.linux-x64-musl.node". Check
+# here, where a retry of this layer fixes it.
+RUN npm ci && node -e "require('lightningcss'); require('@tailwindcss/oxide')"
 
 FROM node:20-alpine AS build
 WORKDIR /app
