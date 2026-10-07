@@ -114,12 +114,24 @@ top-down picture, densest and quickest to read.
 
 **Holo** is a 3D projection of the same picture. Each contact sits at its real
 altitude above a stalk dropped to its ground position, so height is something
-you see rather than read. The amber drum is the alert volume itself — its
-radius and its lid are the two numbers you set — so "close and low" becomes a
-shape. Drag to orbit, scroll to zoom, click a contact to lock it. Altitude is
+you see rather than read. Behind every contact is its trail, fading toward the
+tail — approach paths descend, departures climb, a hold is a stacked oval —
+and ahead of it a line showing the next minute of flight, climb or descent
+included. The amber drum is the alert volume itself — its radius and its lid
+are the two numbers you set — so "close and low" becomes a shape. Drag to
+orbit, scroll to zoom, click a contact to lock it: a reticle settles on it, its
+trail comes up to full strength and its minute ahead goes dashed while
+everything else dims a notch.
+
+![The Holo view over Geneva: the Alps raised in relief, traffic stacked above on stalks](docs/holo.jpg)
+
+With terrain on, the disc becomes the actual ground. Elevation tiles raise the
+relief on the same vertical scale as the aircraft, the site's own elevation is
+the zero plane, and the flight-level ruler shifts to match, so a ridge at
+9,000 ft and an aircraft at 9,000 ft sit at the same height. Altitude is
 exaggerated against the ground scale on purpose: 45,000 ft is barely 7 nm,
-which would be flat against a 50 nm disc, so the altitude ruler is labelled
-with real flight levels.
+which would be flat against a 50 nm disc, so the ruler is labelled with real
+flight levels to keep it honest.
 
 ### Reading the scope
 
@@ -236,9 +248,9 @@ only to the bundled decoder.
 ### What reaches the internet
 
 Nothing, with your own receiver and terrain off. Otherwise: the chosen feed
-sees your position (it has to, to answer); the terrain tile server can infer
-it; and the address box sends what you type to the geocoder. Each of those is
-one setting away from off.
+sees your position (it has to, to answer); the terrain tile server, and in the
+Holo view the elevation tile server, can infer it; and the address box sends
+what you type to the geocoder. Each of those is one setting away from off.
 
 ---
 

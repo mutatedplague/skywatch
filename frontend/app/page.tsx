@@ -213,7 +213,11 @@ export default function Console() {
                   onEdit={() => setSettingsOpen(true)}
                   className="pointer-events-auto absolute bottom-8 left-8 max-w-[17rem]"
                 />
-                <ScopeLegend terrain={terrain} className="absolute bottom-8 right-8 text-right" />
+                <ScopeLegend
+                  terrain={terrain}
+                  relief={view === 'holo'}
+                  className="absolute bottom-8 right-8 text-right"
+                />
               </div>
 
               <ContactCallout
@@ -241,7 +245,7 @@ export default function Console() {
                 terrain={terrain}
                 onTerrain={setTerrain}
               />
-              <ScopeLegend terrain={terrain} />
+              <ScopeLegend terrain={terrain} relief={view === 'holo'} />
             </div>
           </section>
 

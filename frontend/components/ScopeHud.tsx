@@ -1,5 +1,6 @@
 'use client';
 
+import { ELEVATION_ATTRIBUTION } from '@/lib/elevation';
 import { TERRAIN_LAYERS, TERRAIN_NONE, terrainLayer } from '@/lib/terrain';
 import type { SiteConfig } from '@/lib/types';
 import SegmentedControl from './SegmentedControl';
@@ -125,9 +126,12 @@ function Row({ label, value, clamp = false }: { label: string; value: string; cl
 
 export function ScopeLegend({
   terrain = TERRAIN_NONE,
+  relief = false,
   className = '',
 }: {
   terrain?: string;
+  /** True while the hologram is drawing ground heights, which have their own source. */
+  relief?: boolean;
   className?: string;
 }) {
   const layer = terrainLayer(terrain);
@@ -148,6 +152,7 @@ export function ScopeLegend({
         Aircraft icons by ADS-B Radar
       </a>
       {layer ? <p className="text-ink-dim">Terrain {layer.attribution}</p> : null}
+      {layer && relief ? <p className="text-ink-dim">Elevation {ELEVATION_ATTRIBUTION}</p> : null}
     </div>
   );
 }

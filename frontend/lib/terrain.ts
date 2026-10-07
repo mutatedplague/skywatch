@@ -66,18 +66,18 @@ export function terrainLayer(id: string): TerrainLayer | null {
   return TERRAIN_LAYERS.find((layer) => layer.id === id) ?? null;
 }
 
-const TILE_PX = 256;
+export const TILE_PX = 256;
 /** Equatorial metres per pixel at zoom 0 for 256px tiles. */
-const EQUATOR_MPP = 156543.03392;
-const METRES_PER_NM = 1852;
+export const EQUATOR_MPP = 156543.03392;
+export const METRES_PER_NM = 1852;
 /** A hard ceiling on tiles per composite, so a wide range cannot fan out. */
-const MAX_TILES = 90;
+export const MAX_TILES = 90;
 
 const images = new Map<string, HTMLImageElement>();
 const failed = new Set<string>();
 
 /** Shared across instances, so switching view or range reuses what is loaded. */
-function requestTile(url: string, onLoad: () => void): HTMLImageElement | null {
+export function requestTile(url: string, onLoad: () => void): HTMLImageElement | null {
   const existing = images.get(url);
   if (existing) return existing.complete && existing.naturalWidth > 0 ? existing : null;
   if (failed.has(url)) return null;
@@ -96,18 +96,18 @@ function requestTile(url: string, onLoad: () => void): HTMLImageElement | null {
   return null;
 }
 
-function lonToTileX(lon: number, zoom: number): number {
+export function lonToTileX(lon: number, zoom: number): number {
   return ((lon + 180) / 360) * 2 ** zoom;
 }
 
-function latToTileY(lat: number, zoom: number): number {
+export function latToTileY(lat: number, zoom: number): number {
   const clamped = Math.max(-85.05112878, Math.min(85.05112878, lat));
   const radians = (clamped * Math.PI) / 180;
   return ((1 - Math.log(Math.tan(radians) + 1 / Math.cos(radians)) / Math.PI) / 2) * 2 ** zoom;
 }
 
 /** The zoom whose pixels are just finer than the span we have to cover. */
-function zoomFor(lat: number, spanNm: number, sizePx: number, maxZoom: number): number {
+export function zoomFor(lat: number, spanNm: number, sizePx: number, maxZoom: number): number {
   const metresNeededPerPixel = (spanNm * METRES_PER_NM) / sizePx;
   const scale = (EQUATOR_MPP * Math.cos((lat * Math.PI) / 180)) / metresNeededPerPixel;
   return Math.max(1, Math.min(maxZoom, Math.floor(Math.log2(scale))));
