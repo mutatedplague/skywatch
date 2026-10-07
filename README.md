@@ -6,13 +6,13 @@
 
 A radar console for the sky over your house. Plug in a $30 RTL-SDR dongle, or
 use a free community feed with no hardware at all, and every aircraft within
-range appears on a phosphor scope with a live contact list, proximity alerts
-and a full track readout.
+range appears at its real altitude over the real terrain, with a live contact
+list, proximity alerts and a full track readout.
 
 One `docker compose up`, then the console asks you four questions. No `.env`
 to edit, no account to make.
 
-![The SKYWATCH console tracking traffic around a site near Denver](docs/console.jpg)
+![The SKYWATCH console over Geneva: live traffic at altitude above the Alps in relief](docs/console.jpg)
 
 - **Your own radio, or none.** A bundled `dump1090-fa` decoder drives a USB
   RTL-SDR. Without one, adsb.lol, airplanes.live and OpenSky give you real
@@ -21,9 +21,9 @@ to edit, no account to make.
   receiver keeps the station so every console that connects sees the same one.
 - **Tells you what is overhead.** Anything close and low turns amber, jumps to
   the top of the list, and can ring a tone. The volume is yours to size.
-- **Two views, five themes.** A plan-view scope with a sweep and phosphor
-  persistence, or a 3D projection where every contact floats at its real
-  altitude over a terrain map.
+- **The sky as a volume.** Every contact floats at its real altitude over
+  real relief, with its trail behind it and its next minute ahead. Drag to
+  orbit, click to lock. Five themes.
 - **Runs anywhere Docker does.** A Raspberry Pi in the loft is plenty.
 
 ---
@@ -104,17 +104,10 @@ The station is saved to a Docker volume, so it survives rebuilds and restarts.
 
 ## The console
 
-### Two views
+### The view
 
-**View** in the top rail switches between them; both share the range, terrain
-and theme controls, the contact list and the track readout.
-
-**Scope** is the classic plan view: a sweep, phosphor persistence and a
-top-down picture, densest and quickest to read.
-
-**3D** is a projection of the same picture. Each contact sits at its real
-altitude above a stalk dropped to its ground position, so height is something
-you see rather than read. Behind every contact is its trail, fading toward the
+Each contact sits at its real altitude above a stalk dropped to its ground
+position, so height is something you see rather than read. Behind every contact is its trail, fading toward the
 tail — approach paths descend, departures climb, a hold is a stacked oval —
 and ahead of it a line showing the next minute of flight, climb or descent
 included. The amber drum is the alert volume itself — its radius and its lid
@@ -122,8 +115,6 @@ are the two numbers you set — so "close and low" becomes a shape. Drag to
 orbit, scroll to zoom, click a contact to lock it: a reticle settles on it, its
 trail comes up to full strength and its minute ahead goes dashed while
 everything else dims a notch.
-
-![The 3D view over Geneva: the Alps raised in relief, traffic stacked above on stalks](docs/holo.jpg)
 
 With terrain on, the disc becomes the actual ground. The same elevation data
 that shades the relief raises it in 3D on the same vertical scale as the
@@ -136,23 +127,24 @@ the ground scale on purpose: 45,000 ft is barely 7 nm, which would be flat
 against a 50 nm disc, so the ruler is labelled with real flight levels to keep
 it honest.
 
-### Reading the scope
+### Reading it
 
 | What you see | What it means |
 | --- | --- |
-| Blue-white flash | The sweep just painted that contact |
-| Fading trail | Phosphor persistence until the next sweep |
+| Stalk from the ground | The contact's height; its foot is where it is over the map |
+| Fading line behind | Where it has been since it came into range, altitude included |
+| Line ahead | One minute of travel at the current speed, climb or descent included |
 | Amber symbol | Inside your alert volume — airborne, close and low |
 | Red symbol | Squawking 7500, 7600 or 7700 |
-| Square bracket | Flagged military in the receiver's database |
-| Line off the nose | One minute of travel at the current ground speed |
-| Dotted tail | Where the contact has been since it came into range |
-| Dashed inner ring | The alert volume |
+| Amber drum | The alert volume: its radius and its lid are the two numbers you set |
+| White ring on a glyph | The locked contact; its line ahead goes dashed |
+| Numbers on the rings | Distance in nautical miles; bearings round the rim |
+| Ruler at the centre | Flight levels, measured from the ground under your site |
 
-Click any contact on the scope or in the list to lock it; the bar along the
-bottom then carries its full track. `Esc` clears the lock. **Range** zooms the
-scope, **Symbols** switches between aircraft silhouettes and plain blips, and
-**Tone** plays a short sound when a new contact enters the airspace.
+Click any contact in the scene or in the list to lock it; the bar along the
+bottom then carries its full track. `Esc` clears the lock. **Range** sets how
+far the disc reaches, and **Tone** plays a short sound when a new contact
+enters the airspace.
 
 ### Contacts and alerts
 
@@ -173,7 +165,7 @@ as soon as it is picked.
 
 ### Terrain
 
-**Terrain** underlays both views with the ground around your site. **Relief**
+**Terrain** puts the ground around your site under the traffic. **Relief**
 is drawn by the console itself from open elevation data: a hillshade lit from
 the north-west, with contour lines at an interval picked from the relief in
 view, so a river valley in flat country and an alpine ridge each come out
@@ -187,8 +179,8 @@ require.
 
 **Accent**, under Settings, picks one of five palettes — the original radar
 green, blue, cyan, violet and a neutral grey — that recolour the chrome, the
-scope, the 3D view and the terrain tint together. Amber alerts and red
-emergency squawks keep their meaning in every theme.
+scene and the terrain tint together. Amber alerts and red emergency squawks
+keep their meaning in every theme.
 
 ---
 
@@ -329,10 +321,10 @@ adapter. The station — position, feed, alert volume — lives in a small JSON
 file the console writes through the API, and the receiver rebuilds its source
 and tracker the moment it changes.
 
-The **console** (`frontend/`, Next.js + React) draws the scope on a canvas at
-display refresh rate while the data underneath updates about once a second. The
-sweep, the phosphor decay and the lock reticle are animation; everything else
-comes straight off the feed.
+The **console** (`frontend/`, Next.js + React + three.js) draws the scene in
+WebGL at display refresh rate while the data underneath updates about once a
+second. The camera's drift and the lock reticle's breathing are animation;
+everything else comes straight off the feed.
 
 ---
 

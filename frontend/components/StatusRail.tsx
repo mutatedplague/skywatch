@@ -3,14 +3,6 @@
 import { useEffect, useState } from 'react';
 import { formatClock, formatDistance } from '@/lib/format';
 import type { FeedStats, LinkState, SiteConfig } from '@/lib/types';
-import SegmentedControl from './SegmentedControl';
-
-export type ScopeView = 'scope' | 'holo';
-
-const VIEW_OPTIONS: Array<{ value: ScopeView; label: string }> = [
-  { value: 'scope', label: 'Scope' },
-  { value: 'holo', label: '3D' },
-];
 
 const LINK_BUTTON =
   'border-b border-transparent pb-0.5 text-small text-ink-dim transition-colors hover:border-hairline-lit hover:text-ink';
@@ -23,8 +15,6 @@ interface StatusRailProps {
   link: LinkState;
   audio: boolean;
   onToggleAudio: () => void;
-  view: ScopeView;
-  onView: (view: ScopeView) => void;
   onOpenSettings: () => void;
   /** The first-run wizard, for a receiver that has no position at all yet. */
   onOpenSetup: () => void;
@@ -43,8 +33,6 @@ export default function StatusRail({
   link,
   audio,
   onToggleAudio,
-  view,
-  onView,
   onOpenSettings,
   onOpenSetup,
 }: StatusRailProps) {
@@ -95,8 +83,6 @@ export default function StatusRail({
               : 'Simulated traffic — choose a receiver'}
           </button>
         ) : null}
-
-        <SegmentedControl label="View" options={VIEW_OPTIONS} value={view} onChange={onView} />
 
         {config?.siteEditable !== false ? (
           <button type="button" onClick={onOpenSettings} className={LINK_BUTTON}>

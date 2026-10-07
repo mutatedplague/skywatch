@@ -4,12 +4,6 @@ import { ELEVATION_ATTRIBUTION } from '@/lib/elevation';
 import { TERRAIN_LAYERS, TERRAIN_NONE, terrainLayer } from '@/lib/terrain';
 import type { SiteConfig } from '@/lib/types';
 import SegmentedControl from './SegmentedControl';
-import type { Symbology } from './RadarScope';
-
-const SYMBOLOGY_OPTIONS: Array<{ value: Symbology; label: string }> = [
-  { value: 'icons', label: 'Silhouettes' },
-  { value: 'blips', label: 'Blips' },
-];
 
 const TERRAIN_OPTIONS: Array<{ value: string; label: string }> = [
   { value: TERRAIN_NONE, label: 'Off' },
@@ -23,10 +17,6 @@ interface ScopeControlsProps {
   rangeOptions: Array<{ value: number; label: string }>;
   rangeNm: number;
   onRange: (value: number) => void;
-  symbology: Symbology;
-  onSymbology: (value: Symbology) => void;
-  /** Hidden in the 3D view, which has no blip symbology to switch. */
-  showSymbology?: boolean;
   terrain: string;
   onTerrain: (value: string) => void;
   className?: string;
@@ -36,9 +26,6 @@ export function ScopeControls({
   rangeOptions,
   rangeNm,
   onRange,
-  symbology,
-  onSymbology,
-  showSymbology = true,
   terrain,
   onTerrain,
   className = '',
@@ -52,14 +39,6 @@ export function ScopeControls({
         suffix="nm"
         onChange={onRange}
       />
-      {showSymbology ? (
-        <SegmentedControl
-          label="Symbols"
-          options={SYMBOLOGY_OPTIONS}
-          value={symbology}
-          onChange={onSymbology}
-        />
-      ) : null}
       <SegmentedControl
         label="Terrain"
         options={TERRAIN_OPTIONS}
@@ -126,12 +105,9 @@ function Row({ label, value, clamp = false }: { label: string; value: string; cl
 
 export function ScopeLegend({
   terrain = TERRAIN_NONE,
-  relief = false,
   className = '',
 }: {
   terrain?: string;
-  /** True while the 3D view is drawing ground heights, which have their own source. */
-  relief?: boolean;
   className?: string;
 }) {
   const layer = terrainLayer(terrain);
@@ -152,7 +128,8 @@ export function ScopeLegend({
         Aircraft icons by ADS-B Radar
       </a>
       {layer ? <p className="text-ink-dim">Terrain {layer.attribution}</p> : null}
-      {layer && relief && layer.source !== 'elevation' ? (
+      {/* Map layers still take their ground heights from the elevation data. */}
+      {layer && layer.source !== 'elevation' ? (
         <p className="text-ink-dim">Elevation {ELEVATION_ATTRIBUTION}</p>
       ) : null}
     </div>

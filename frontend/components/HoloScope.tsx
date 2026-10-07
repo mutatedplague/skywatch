@@ -310,25 +310,34 @@ export default function HoloScope({
       opacity: 0.34,
     });
 
-    /** Rings and spokes, rebuilt whenever the range or the ground changes. */
+    /** Rings, spokes and ring labels, rebuilt whenever the range or the ground changes. */
     let lines = new THREE.Group();
     furniture.add(lines);
     const buildFurniture = (range: number) => {
       lines.removeFromParent();
       lines.traverse((node) => {
         if (node instanceof THREE.Line) node.geometry.dispose();
+        if (node instanceof THREE.Sprite) {
+          node.material.map?.dispose();
+          node.material.dispose();
+        }
       });
       lines = new THREE.Group();
 
       lines.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(drape(ringPoints(DISC_UNITS))), discMaterial));
       const scale = unitsPerNm(range);
+      // Distance on each ring, on the 045 radial, out of the way of most traffic.
+      const radial = Math.PI / 4;
       for (const radiusNm of ringRadii(range)) {
+        const r = radiusNm * scale;
         lines.add(
-          new THREE.Line(
-            new THREE.BufferGeometry().setFromPoints(drape(ringPoints(radiusNm * scale))),
-            innerMaterial,
-          ),
+          new THREE.Line(new THREE.BufferGeometry().setFromPoints(drape(ringPoints(r))), innerMaterial),
         );
+        const label = makeLabel(String(radiusNm), inkDimCss, 9, false);
+        const x = Math.sin(radial) * r;
+        const z = -Math.cos(radial) * r;
+        label.position.set(x + 1, surfaceY(x, z) + 1.2, z);
+        lines.add(label);
       }
 
       // Bearing spokes every 30°, plus a brighter pair on the cardinals.
@@ -362,7 +371,9 @@ export default function HoloScope({
     ruler.add(rulerAxis);
 
     const labelSprites: THREE.Sprite[] = [];
-    const makeLabel = (text: string, color: string, px: number) => {
+    /** A text sprite. Static labels are tracked for disposal at teardown;
+     *  ones that are rebuilt with the furniture are disposed with it. */
+    const makeLabel = (text: string, color: string, px: number, permanent = true) => {
       const canvas = document.createElement('canvas');
       canvas.width = 256;
       canvas.height = 64;
@@ -374,7 +385,7 @@ export default function HoloScope({
       );
       sprite.scale.set(px, px / 4, 1);
       sprite.center.set(0, 0.5);
-      labelSprites.push(sprite);
+      if (permanent) labelSprites.push(sprite);
       return sprite;
     };
 
@@ -418,6 +429,20 @@ export default function HoloScope({
     for (const [letter, x, z] of cardinals) {
       const label = makeLabel(letter, inkDimCss, 14);
       label.position.set(x * DISC_UNITS * 1.06, 1.5, z * DISC_UNITS * 1.06);
+      label.center.set(0.5, 0.5);
+      furniture.add(label);
+    }
+    // Bearings every 30° between them, the way a compass rose is read, so a
+    // position call like "zero-six-zero" lands somewhere on the disc.
+    for (let bearing = 30; bearing < 360; bearing += 30) {
+      if (bearing % 90 === 0) continue;
+      const radians = (bearing * Math.PI) / 180;
+      const label = makeLabel(String(bearing).padStart(3, '0'), inkDimCss, 10);
+      label.position.set(
+        Math.sin(radians) * DISC_UNITS * 1.06,
+        1.5,
+        -Math.cos(radians) * DISC_UNITS * 1.06,
+      );
       label.center.set(0.5, 0.5);
       furniture.add(label);
     }
