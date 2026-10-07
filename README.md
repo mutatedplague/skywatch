@@ -121,7 +121,7 @@ that shades the relief raises it in 3D; the site's own elevation is the zero
 plane, and the flight-level ruler shifts to match. Dramatic country — the
 Rockies, the Alps — is drawn on the same vertical scale as the aircraft, so a
 ridge at 9,000 ft and an aircraft at 9,000 ft sit at the same height. Gentle
-country would vanish at that scale, so it is drawn taller, up to twelve times,
+country would vanish at that scale, so it is drawn taller, up to ten times,
 and the legend says by how much. Two things stay true whatever the ground is
 drawn at: the ruler at the site, and every stalk, which is always the
 aircraft's real height above the ground beneath it. Altitude itself is
@@ -171,11 +171,14 @@ as soon as it is picked.
 is drawn by the console itself from open elevation data: a hillshade lit from
 the north-west, with contour lines at an interval picked from the relief in
 view, so a river valley in flat country and an alpine ridge each come out
-legible. **Satellite** imagery and dark **streets** are map tiles. Every layer
-means fetching from a server that can infer roughly where your site is from
-what it is asked for; **Off** keeps the console from fetching any. Attribution
-for the active layer is shown in the corner of the scope, as those services
-require.
+legible. Over it — and over **satellite** imagery — go the roads, rivers,
+lakes, towns and airports from OpenStreetMap, drawn from vector tiles served
+by [OpenFreeMap](https://openfreemap.org) with no key and no account: major
+roads at any range, smaller ones as you zoom in, airports by ICAO code. Dark
+**streets** is a ready-made map. Every layer means fetching from a server that
+can infer roughly where your site is from what it is asked for; **Off** keeps
+the console from fetching any. Attribution for the active layer is shown in
+the corner of the scope, as those services require.
 
 ### Themes
 
@@ -248,9 +251,9 @@ only to the bundled decoder.
 ### What reaches the internet
 
 Nothing, with your own receiver and terrain off. Otherwise: the chosen feed
-sees your position (it has to, to answer); the elevation or map tile server
-behind the terrain layer can infer it; and the address box sends what you type
-to the geocoder. Each of those is one setting away from off.
+sees your position (it has to, to answer); the elevation, map and vector tile
+servers behind the terrain layer can infer it; and the address box sends what
+you type to the geocoder. Each of those is one setting away from off.
 
 ---
 

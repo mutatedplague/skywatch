@@ -1,5 +1,6 @@
 'use client';
 
+import { BASEMAP_ATTRIBUTION } from '@/lib/basemap';
 import { ELEVATION_ATTRIBUTION } from '@/lib/elevation';
 import { TERRAIN_LAYERS, TERRAIN_NONE, terrainLayer } from '@/lib/terrain';
 import type { SiteConfig } from '@/lib/types';
@@ -141,6 +142,7 @@ export function ScopeLegend({
       {layer && layer.source !== 'elevation' ? (
         <p className="text-ink-dim">Elevation {ELEVATION_ATTRIBUTION}</p>
       ) : null}
+      {layer?.overlay ? <p className="text-ink-dim">Roads and places {BASEMAP_ATTRIBUTION}</p> : null}
     </div>
   );
 }

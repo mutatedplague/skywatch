@@ -1,26 +1,28 @@
 'use client';
 
+import { BasemapOverlay } from './basemap';
 import { ELEVATION_ATTRIBUTION, ElevationRaster } from './elevation';
 import { paintRelief } from './hillshade';
 import { cachedTile, requestTile, TILE_PX, tileWindow, zoomFor } from './tiles';
 
 /**
- * Terrain underlay shared by both views.
+ * The ground under the traffic.
  *
  * One square offscreen canvas covers 2 × rangeNm on a side, centred on the
- * site. Both consumers then need only one line of maths: the 2D scope blits
- * that square across the scope circle's bounding box, and the 3D disc uses it
- * as its texture through UVs that map to the same bounding square.
+ * site, and the 3D disc uses it as its texture through UVs that map to the
+ * same bounding square. Relief is drawn here from elevation data — hillshade
+ * and contours — so it is as sharp as the ground deserves; satellite and
+ * streets are Web Mercator tiles composited into the square. Roads, water,
+ * towns and airports are then drawn over relief and satellite from vector
+ * tiles, in the same pixel space, so they land where they belong.
  *
- * Relief is drawn here from elevation data — hillshade and contours — so it
- * is as sharp as the ground deserves. Satellite and streets are Web Mercator
- * tiles composited into the square. Mercator is conformal, so near the centre
- * the scale is uniform; by the edge of a wide range ring it stretches slightly
- * in latitude, a fair trade against reprojecting every tile per frame.
+ * Mercator is conformal, so near the centre the scale is uniform; by the edge
+ * of a wide range ring it stretches slightly in latitude, a fair trade against
+ * reprojecting everything per frame.
  *
- * Any layer means the console reaches the internet, and the server can infer
- * roughly where the site is from what it is asked for. TERRAIN_NONE keeps the
- * old behaviour and is honoured everywhere.
+ * Any layer means the console reaches the internet, and the servers can infer
+ * roughly where the site is from what they are asked for. TERRAIN_NONE keeps
+ * the old behaviour and is honoured everywhere.
  */
 
 export interface TerrainLayer {
@@ -34,6 +36,8 @@ export interface TerrainLayer {
   maxZoom: number;
   /** neutral strips the tiles' colour entirely; natural keeps it, dimmed. */
   treatment: 'neutral' | 'natural';
+  /** Whether roads, water and names are drawn on top. Streets has its own. */
+  overlay: boolean;
 }
 
 export const TERRAIN_NONE = 'none';
@@ -46,6 +50,7 @@ export const TERRAIN_LAYERS: TerrainLayer[] = [
     attribution: ELEVATION_ATTRIBUTION,
     maxZoom: 13,
     treatment: 'neutral',
+    overlay: true,
   },
   {
     id: 'imagery',
@@ -56,6 +61,7 @@ export const TERRAIN_LAYERS: TerrainLayer[] = [
     attribution: 'Esri, Maxar, Earthstar Geographics',
     maxZoom: 18,
     treatment: 'natural',
+    overlay: true,
   },
   {
     id: 'streets',
@@ -65,6 +71,7 @@ export const TERRAIN_LAYERS: TerrainLayer[] = [
     attribution: '© OpenStreetMap contributors, © CARTO',
     maxZoom: 19,
     treatment: 'neutral',
+    overlay: false,
   },
 ];
 
@@ -74,8 +81,10 @@ export function terrainLayer(id: string): TerrainLayer | null {
 
 export class TerrainRaster {
   readonly canvas: HTMLCanvasElement;
-  /** Heights for the window, shared with the 3D view's relief geometry. */
+  /** Heights for the window, shared with the relief geometry. */
   readonly elevation: ElevationRaster;
+  /** Roads, water and names for the window. */
+  readonly basemap: BasemapOverlay;
   /** Bumped whenever the picture changes, so a texture knows to re-upload. */
   version = 0;
   /** True once something has been painted. */
@@ -85,14 +94,20 @@ export class TerrainRaster {
 
   private key = '';
   private layer: TerrainLayer | null = null;
+  /** Redraws the base and the overlay from whatever has arrived so far. */
+  private repaint: (() => void) | null = null;
 
   constructor(private readonly size = 1024) {
     this.canvas = document.createElement('canvas');
     this.canvas.width = size;
     this.canvas.height = size;
     this.elevation = new ElevationRaster(512);
+    this.basemap = new BasemapOverlay();
     this.elevation.subscribe(() => {
-      if (this.layer?.source === 'elevation' && this.elevation.ready) this.paintElevation();
+      if (this.layer?.source === 'elevation' && this.elevation.ready) this.repaint?.();
+    });
+    this.basemap.subscribe(() => {
+      if (this.layer?.overlay) this.repaint?.();
     });
   }
 
@@ -116,6 +131,7 @@ export class TerrainRaster {
     this.key = key;
     this.layer = layer;
     this.contourIntervalFt = 0;
+    this.repaint = null;
 
     const ctx = this.canvas.getContext('2d');
     if (!ctx) return;
@@ -125,21 +141,34 @@ export class TerrainRaster {
     this.version += 1;
 
     if (!layer) return;
+    if (layer.overlay) this.basemap.configure(lat, lon, quantised, this.size);
+
     if (layer.source === 'elevation') {
       this.elevation.configure(lat, lon, quantised);
-      if (this.elevation.ready) this.paintElevation();
+      this.repaint = () => {
+        this.contourIntervalFt = paintRelief(this.canvas, this.elevation);
+        this.finish(ctx, layer);
+      };
+      if (this.elevation.ready) this.repaint();
       return;
     }
-    this.paintTiles(layer, lat, lon, quantised);
+    this.paintTiles(ctx, layer, lat, lon, quantised);
   }
 
-  private paintElevation(): void {
-    this.contourIntervalFt = paintRelief(this.canvas, this.elevation);
+  /** The overlay goes on last, and the picture is declared ready. */
+  private finish(ctx: CanvasRenderingContext2D, layer: TerrainLayer): void {
+    if (layer.overlay) this.basemap.draw(ctx, this.size);
     this.ready = true;
     this.version += 1;
   }
 
-  private paintTiles(layer: TerrainLayer, lat: number, lon: number, spanNm: number): void {
+  private paintTiles(
+    ctx: CanvasRenderingContext2D,
+    layer: TerrainLayer,
+    lat: number,
+    lon: number,
+    spanNm: number,
+  ): void {
     const zoom = zoomFor(lat, spanNm, this.size, layer.maxZoom);
     const window = tileWindow(lat, lon, spanNm, zoom, this.size);
     if (!window || !layer.url) return;
@@ -149,8 +178,6 @@ export class TerrainRaster {
     const compose = () => {
       // A later configure() supersedes this window; let its tiles drive it.
       if (this.key !== key) return;
-      const ctx = this.canvas.getContext('2d');
-      if (!ctx) return;
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalCompositeOperation = 'source-over';
@@ -178,7 +205,7 @@ export class TerrainRaster {
 
       if (painted === 0) return;
 
-      // Treatment, applied once here so both views get an identical underlay.
+      // Treatment, applied once here so the texture is ready to use.
       //
       // Terrain is context, not data, so it stays achromatic: colour on this
       // console means something (accent = active, amber = in the alert volume,
@@ -195,10 +222,10 @@ export class TerrainRaster {
       ctx.fillRect(0, 0, this.size, this.size);
       ctx.globalCompositeOperation = 'source-over';
 
-      this.ready = true;
-      this.version += 1;
+      this.finish(ctx, layer);
     };
 
+    this.repaint = compose;
     compose();
   }
 }

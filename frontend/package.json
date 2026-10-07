@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mapbox/vector-tile": "^3.0.0",
     "next": "^15.1.0",
+    "pbf": "^5.1.2",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "three": "^0.180.0"

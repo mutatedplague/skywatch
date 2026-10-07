@@ -35,8 +35,8 @@ const SPOKE_STEPS = 40;
  * the relief in view is stretched toward this many units, never beyond this
  * factor, and never at all once the ground is dramatic enough on its own.
  */
-const RELIEF_TARGET_UNITS = 10;
-const RELIEF_MAX_FACTOR = 12;
+const RELIEF_TARGET_UNITS = 8;
+const RELIEF_MAX_FACTOR = 10;
 
 interface HoloScopeProps {
   aircraft: Aircraft[];
@@ -509,7 +509,7 @@ export default function HoloScope({
       discGeometry.computeBoundingSphere();
       // Readable from devtools, and the one place the datum is stated in words.
       host.dataset.relief = relief
-        ? `datum ${Math.round(datumFt)} ft, ground ${lowest.toFixed(1)} to ${highest.toFixed(1)} units at x${reliefFactor}`
+        ? `datum ${Math.round(datumFt)} ft, ground ${lowest.toFixed(1)} to ${highest.toFixed(1)} units at x${reliefFactor} (true ${Math.round(elevation.lowestM)}..${Math.round(elevation.highestM)} m)`
         : 'flat';
     };
 
