@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:20-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 # npm treats a platform-specific native module as optional, so a failed fetch
@@ -9,7 +9,7 @@ COPY package.json package-lock.json ./
 # here, where a retry of this layer fixes it.
 RUN npm ci && node -e "require('lightningcss'); require('@tailwindcss/oxide')"
 
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -24,7 +24,7 @@ ENV NEXT_PUBLIC_API_PORT=$NEXT_PUBLIC_API_PORT \
     NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM node:20-alpine AS runtime
+FROM node:26-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
