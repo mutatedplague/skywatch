@@ -139,7 +139,7 @@ export function ScopeLegend({
       ) : null}
       {layer ? <p className="text-ink-dim">Terrain {layer.attribution}</p> : null}
       {/* Map layers still take their ground heights from the elevation data. */}
-      {layer && layer.source !== 'elevation' ? (
+      {layer && layer.source === 'tiles' ? (
         <p className="text-ink-dim">Elevation {ELEVATION_ATTRIBUTION}</p>
       ) : null}
       {layer?.overlay ? <p className="text-ink-dim">Roads and places {BASEMAP_ATTRIBUTION}</p> : null}
