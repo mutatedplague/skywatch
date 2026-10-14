@@ -12,9 +12,9 @@ import { cachedTile, requestTile, TILE_PX, tileWindow, zoomFor } from './tiles';
  * One square offscreen canvas covers 2 × rangeNm on a side, centred on the
  * site, and the 3D disc uses it as its texture through UVs that map to the
  * same bounding square. Relief is drawn here from elevation data — hillshade
- * and contours — so it is as sharp as the ground deserves; satellite and
- * streets are Web Mercator tiles composited into the square. Roads, water,
- * towns and airports are then drawn over relief and satellite from vector
+ * and contours — so it is as sharp as the ground deserves; satellite is Web
+ * Mercator tiles composited into the square, and streets is plain ground.
+ * Roads, water, towns and airports are then drawn over every layer from vector
  * tiles, in the same pixel space, so they land where they belong.
  *
  * Mercator is conformal, so near the centre the scale is uniform; by the edge
@@ -29,15 +29,15 @@ import { cachedTile, requestTile, TILE_PX, tileWindow, zoomFor } from './tiles';
 export interface TerrainLayer {
   id: string;
   label: string;
-  /** Drawn from elevation data here, or composited from a tile server. */
-  source: 'elevation' | 'tiles';
+  /** Drawn from elevation data here, composited from a tile server, or a flat ground. */
+  source: 'elevation' | 'tiles' | 'plain';
   /** Tile URL, for the console's mode; note Esri orders the path z/y/x, not z/x/y. */
   url?: (z: number, x: number, y: number, mode: Mode) => string;
   attribution: string;
   maxZoom: number;
   /** neutral strips the tiles' colour entirely; natural keeps it, dimmed. */
   treatment: 'neutral' | 'natural';
-  /** Whether roads, water and names are drawn on top. Streets has its own. */
+  /** Whether roads, water and names are drawn on top. */
   overlay: boolean;
 }
 
@@ -65,15 +65,16 @@ export const TERRAIN_LAYERS: TerrainLayer[] = [
     overlay: true,
   },
   {
+    // Flat ground under the vector overlay. Raster street tiles that need no
+    // key keep disappearing (CARTO's now serve an "API key required" mark), so
+    // the roads, water and names come from the overlay the other layers use.
     id: 'streets',
     label: 'streets',
-    source: 'tiles',
-    url: (z, x, y, mode) =>
-      `https://basemaps.cartocdn.com/${mode === 'light' ? 'light_all' : 'dark_all'}/${z}/${x}/${y}.png`,
-    attribution: '© OpenStreetMap contributors, © CARTO',
+    source: 'plain',
+    attribution: ELEVATION_ATTRIBUTION,
     maxZoom: 19,
     treatment: 'neutral',
-    overlay: false,
+    overlay: true,
   },
 ];
 
@@ -154,6 +155,18 @@ export class TerrainRaster {
         this.finish(ctx, layer);
       };
       if (this.elevation.ready) this.repaint();
+      return;
+    }
+    if (layer.source === 'plain') {
+      this.repaint = () => {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalCompositeOperation = 'source-over';
+        // The grey relief gives flat ground, so the two layers sit alike.
+        ctx.fillStyle = mode === 'light' ? '#cccccc' : '#666666';
+        ctx.fillRect(0, 0, this.size, this.size);
+        this.finish(ctx, layer);
+      };
+      this.repaint();
       return;
     }
     this.paintTiles(ctx, layer, lat, lon, quantised);
