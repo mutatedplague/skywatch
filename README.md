@@ -12,7 +12,7 @@ list, proximity alerts and a full track readout.
 One `docker compose up`, then the console asks you four questions. No `.env`
 to edit, no account to make.
 
-![The SKYWATCH console over Geneva: live traffic at altitude above the Alps in relief](docs/console.jpg)
+![The SKYWATCH console at Cheyenne Mountain, Colorado Springs: a handful of flights at altitude above the Front Range in relief](docs/console.jpg)
 
 - **Your own radio, or none.** A bundled `dump1090-fa` decoder drives a USB
   RTL-SDR. Without one, adsb.lol, airplanes.live and OpenSky give you real
